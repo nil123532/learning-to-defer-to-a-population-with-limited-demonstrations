@@ -1,3 +1,4 @@
-/generating-pseudo-labels/CIFAR10/
-
-gbsgbsi
+generating-pseudo-labels/CIFAR10/
+l2d-pop/data/
+l2d-pop/runs/
+l2d-pop/pretrained/
