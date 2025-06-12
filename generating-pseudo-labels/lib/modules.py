@@ -1,5 +1,4 @@
 import torch.nn as nn
-from WideResNet import Normalize
 import functools
 import torch
 import sys

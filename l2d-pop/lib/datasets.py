@@ -72,9 +72,9 @@ class ContextSampler():
             data_batch = next(self.data_iter)
 
         if self.with_additional_label:
-            input_all, target_all, target_all_sparse = data_batch
-            input_all, target_all, target_all_sparse = input_all.to(self.device), target_all.to(self.device), target_all_sparse.to(self.device)
-            return input_all, target_all, target_all_sparse
+            input_all, target_all, indices = data_batch
+            input_all, target_all, indices = input_all.to(self.device), target_all.to(self.device), indices.to(self.device)
+            return input_all, target_all, indices
         else:
             input_all, target_all = data_batch
             input_all, target_all = input_all.to(self.device), target_all.to(self.device)
@@ -85,11 +85,11 @@ class ContextSampler():
         # Not resample for multiple experts (at train-time)
         cntx = AttrDict()
         if self.with_additional_label:
-            input, target, target_sparse = self._balanced_sample()
-            cntx.yc_sparse = target_sparse.unsqueeze(0).repeat(n_experts,1)
+            input, target, indices = self._balanced_sample()
+            cntx.yc_index = indices.unsqueeze(0).repeat(n_experts,1)
         else:
             input, target = self._balanced_sample()
-            cntx.yc_sparse = None
+            cntx.yc_index = None
         cntx.xc = input.unsqueeze(0).repeat(n_experts,1,1,1,1)
         cntx.yc = target.unsqueeze(0).repeat(n_experts,1)
 
@@ -183,6 +183,14 @@ def load_cifar(variety='10', data_aug=False, seed=0, train_split=0.9,expert_type
             val_dataset = MyVisionDataset(images_val, targets_val, transform_test)
             test_dataset = datasets.CIFAR10(root=ROOT+'/data', train=False, download=True, transform=transform_test)
 
+        elif expert_type == "limited_demo":
+            images_train, _, targets_train, _, indices_train, _ = train_test_split(images_train,targets_train,indices_train,train_size=500,random_state=seed,stratify=targets_train) 
+            print("Data for  limited demo")
+            train_dataset = MyVisionDataset(images_train,targets_train,transform_train,indices_train)
+            val_dataset = MyVisionDataset(images_val,targets_val,transform_test,indices_val)
+            test_dataset = datasets.CIFAR10(root=ROOT+'/data', train=False, download=True, transform=transform_test)
+            original_indices = np.arange(len(test_dataset))
+            test_dataset = MyVisionDataset(test_dataset.data,test_dataset.targets,transform_test,original_indices)
         else:
             print("Data for noisy experts")
             train_dataset = MyVisionDataset(images_train,targets_train,transform_train,indices_train)
@@ -239,6 +247,13 @@ def load_gtsrb(expert_type=None):
         val_dataset = MyVisionDataset(images_val, targets_val, transform_test)
         test_dataset = MyVisionDataset(images_test, targets_test, transform_test)
 
+    elif expert_type == "limited_demo": 
+        images_train, _, targets_train, _ , indices_train , _ = \
+            train_test_split(images_train,targets_train,indices_train,train_size=500,random_state=0,stratify=targets_train) 
+        print("Data for  limited demo")
+        train_dataset = MyVisionDataset(images_train, targets_train, transform_train, indices_train)
+        val_dataset = MyVisionDataset(images_val, targets_val, transform_test, indices_val)
+        test_dataset = MyVisionDataset(images_test, targets_test, transform_test, indices_test)
 
     else:
         print("Data for generated experts")
@@ -282,7 +297,7 @@ def load_fashion_mnist(expert_type=None):
     targets_test = test_targets_all
     indices_test = original_test_indices  
 
-    # 80/20 split into train/val (unseeded)
+    # 90/10 split into train/val (unseeded)
     images_train, images_val, targets_train, targets_val , indices_train , indices_val = \
         train_test_split(train_images_all, train_targets_all, original_train_indices, train_size=0.9, random_state=0, stratify=train_targets_all)
 
@@ -291,6 +306,14 @@ def load_fashion_mnist(expert_type=None):
         train_dataset = MyVisionDataset(images_train, targets_train, transform_train)
         val_dataset = MyVisionDataset(images_val, targets_val, transform_test)
         test_dataset = MyVisionDataset(images_test, targets_test, transform_test)
+
+    elif expert_type == "limited_demo": 
+        images_train, _, targets_train, _ , indices_train , _ = \
+            train_test_split(images_train,targets_train,indices_train,train_size=500,random_state=0,stratify=targets_train) 
+        print("Data for  limited demo")
+        train_dataset = MyVisionDataset(images_train,targets_train,transform_train,indices_train)
+        val_dataset = MyVisionDataset(images_val,targets_val,transform_test,indices_val)
+        test_dataset = MyVisionDataset(images_test,targets_test,transform_test,indices_test)
     else:
         print("Data for generated experts")
         train_dataset = MyVisionDataset(images_train, targets_train, transform_train,  indices_train)

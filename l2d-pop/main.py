@@ -292,7 +292,8 @@ def evaluate(
 
     # ------------ logging / printing -------------
     msg = msg_prefix + " ".join(
-        f"{k} {v if isinstance(v,str) else v:.6f}" for k, v in final_metrics.items()
+        f"{k} {v}" if isinstance(v, str) else f"{k} {v:.6f}"
+        for k, v in final_metrics.items()
     )
     if logger is not None:
         logger.info(msg)
@@ -627,13 +628,7 @@ def eval(model, val_data, test_data, loss_fn, experts_test, val_cntx_sampler, te
     #         model.load_state_dict(copy.deepcopy(model_state_dict))
     #         evaluate(model, experts_test, loss_fn, test_cntx_sampler, config["n_classes"], test_loader, config, logger, budget, p_cntx_inclusion=p_cntx_inclusion)
 
-def build_experts(
-    dataset: str,
-    n_classes: int,
-    p_out: int | float,
-    n_experts: int = 10,
-    expert_labels: str | None = None,   # only for “generated_expert_labels*”
-):
+def build_experts(dataset,n_classes,p_out,n_experts,expert_labels):
     """
     Returns
     -------
@@ -853,7 +848,7 @@ def main(config):
     experts_train, experts_test = build_experts(
         dataset=config["dataset"],
         n_classes=config["n_classes"],
-        p_out=config["p_out"],
+        p_out=int(config["p_out"]),
         n_experts=config["n_experts"],
         expert_labels=config.get("expert_labels", None)
     )       
@@ -883,7 +878,6 @@ def main(config):
     print("test size:", len(test_data_trgt))
     #NR - changes to val_data_cntx and test_data_cntx
 
-    print(val_data_cntx.dataset.targets_index)
   
     cntx_sampler_val = ContextSampler(images=val_data_cntx.dataset.data[val_data_cntx.indices], 
                                     labels=val_data_cntx.dataset.targets[val_data_cntx.indices], 

@@ -1,0 +1,23 @@
+bash train_generated_experts.sh pop_attn 1 train 0 500 lf && 
+bash train_generated_experts.sh pop_attn 5 train 0 500 lf &&
+bash train_generated_experts.sh pop_attn 9 train 0 500 lf &&
+bash train_cifar10.sh pop_attn  1 train 0 500 w &&
+bash train_cifar10.sh pop_attn  5 train 0 500 w &&
+bash train_cifar10.sh pop_attn  9 train 0 500 w
+
+
+bash train_generated_experts_gtsrb.sh pop_attn 4 train 0 473 lf && 
+bash train_generated_experts_gtsrb.sh pop_attn 21 train 0 473 lf &&
+bash train_generated_experts_gtsrb.sh pop_attn 38 train 0 473 lf &&
+bash train_gtsrb.sh pop_attn  1 train 0 473 w &&
+bash train_gtsrb.sh pop_attn  5 train 0 473 w &&
+bash train_gtsrb.sh pop_attn  9 train 0 473 w
+
+
+
+bash train_generated_experts_fashion.sh pop_attn 1 train 0 500 lf && 
+bash train_generated_experts_fashion.sh pop_attn 5 train 0 500 lf &&
+bash train_generated_experts_fashion.sh pop_attn 9 train 0 500 lf &&
+bash fashion.sh pop_attn  1 train 0 500 w &&
+bash fashion.sh pop_attn  5 train 0 500 w &&
+bash fashion.sh pop_attn  9 train 0 500 w

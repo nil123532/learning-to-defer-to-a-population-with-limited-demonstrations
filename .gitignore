@@ -1,4 +1,8 @@
 generating-pseudo-labels/CIFAR10/
+generating-pseudo-labels/FASHION/
+generating-pseudo-labels/GTSRB/
+generating-pseudo-labels/data/
+generating-pseudo-labels/artificial_expert_labels/
 l2d-pop/data/
 l2d-pop/runs/
 l2d-pop/pretrained/
