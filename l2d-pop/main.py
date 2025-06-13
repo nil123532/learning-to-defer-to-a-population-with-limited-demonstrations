@@ -167,7 +167,7 @@ def evaluate(
                 targets_cntx = expert_cntx.yc.squeeze(0)
                 costs = (exp_preds_ctx == targets_cntx).int()
                 for _ in range(n_finetune_steps):
-                    out_cntx = model(images_cntx, expert_cntx).squeeze(0)
+                    out_cntx = model(images_cntx).squeeze(0)
                     loss = loss_fn(out_cntx, costs, targets_cntx, n_classes)
                     model.zero_grad()
                     loss.backward()
@@ -610,7 +610,7 @@ def eval(model, val_data, test_data, loss_fn, experts_test, val_cntx_sampler, te
 
                 else:
                     metrics = evaluate(model, experts_test, loss_fn, val_cntx_sampler, config["n_classes"], val_loader, config, None, budget, \
-                                n_steps, lr)
+                                n_steps, lr,mean_across_experts=False)
                 score = metrics[scoring_rule] if scoring_rule=='val_loss' else -metrics[scoring_rule]
                 val_scores.append(score)
             idx = np.nanargmin(np.array(val_scores))
@@ -713,7 +713,7 @@ def main(config):
     os.makedirs(config["ckp_dir"], exist_ok=True)
    
     #Cifar10 - augmented labels
-    if config["dataset"] == "generated_expert_labels":
+    if config["dataset"] == "generated_expert_labels_cifar":
         config["n_classes"] = 10
         train_data, val_data, test_data = load_cifar(variety='10', data_aug=False, seed=config["seed"],expert_type="generated_experts")
         resnet_base = WideResNetBase(depth=28, n_channels=3, widen_factor=2, dropRate=0.0, norm_type=config["norm_type"])
@@ -775,7 +775,7 @@ def main(config):
 
     if config["warmstart"]: 
         fn_aug = '' if config['norm_type']=='batchnorm' else '_frn'
-        if config["dataset"] == "generated_expert_labels" or config['dataset'] == "cifar10":
+        if config["dataset"] == "generated_expert_labels_cifar" or config['dataset'] == "cifar10":
             pre_trained_path = "cifar10"
         elif config["dataset"] == "generated_expert_labels_gtsrb" or config['dataset'] == "gtsrb":
             pre_trained_path = "gtsrb"
@@ -884,14 +884,14 @@ def main(config):
                                     transform=val_data.transform, 
                                     n_cntx_pts=config["n_cntx_pts"], 
                                     device=device, 
-                                    original_indices=val_data_cntx.dataset.original_indices[val_data_cntx.indices] if config["dataset"] == "generated_expert_labels" or config["dataset"] == "generated_expert_labels_gtsrb" or config["dataset"] == "generated_expert_labels_fashion" else None,
+                                    original_indices=val_data_cntx.dataset.original_indices[val_data_cntx.indices] if config["dataset"] == "generated_expert_labels_cifar" or config["dataset"] == "generated_expert_labels_gtsrb" or config["dataset"] == "generated_expert_labels_fashion" else None,
                                     **kwargs)
     cntx_sampler_test = ContextSampler(images=test_data_cntx.dataset.data[test_data_cntx.indices], 
                                       labels=np.array(test_data_cntx.dataset.targets)[test_data_cntx.indices], 
                                       transform=test_data.transform, 
                                       n_cntx_pts=config["n_cntx_pts"], 
                                       device=device, 
-                                      original_indices=test_data_cntx.dataset.original_indices[test_data_cntx.indices] if config["dataset"] == "generated_expert_labels" or config["dataset"] == "generated_expert_labels_gtsrb" or config["dataset"]  == "generated_expert_labels_fashion" else None,
+                                      original_indices=test_data_cntx.dataset.original_indices[test_data_cntx.indices] if config["dataset"] == "generated_expert_labels_cifar" or config["dataset"] == "generated_expert_labels_gtsrb" or config["dataset"]  == "generated_expert_labels_fashion" else None,
                                       **kwargs)
     
     if config["mode"] == 'train':
@@ -901,7 +901,7 @@ def main(config):
             train(model, train_data, val_data_trgt, loss_fn, experts_train, experts_test, cntx_sampler_train, cntx_sampler_val, config)
             eval(model, val_data_trgt, test_data_trgt, loss_fn, experts_test, cntx_sampler_val, cntx_sampler_test, config,mean_across_experts=True,experts_train=experts_train)
 
-        elif config["dataset"] == "generated_expert_labels":
+        elif config["dataset"] == "generated_expert_labels_cifar":
             train(model, train_data, val_data_trgt, loss_fn, experts_train, experts_train, cntx_sampler_train, cntx_sampler_val, config)
             eval(model, val_data_trgt, test_data_trgt, loss_fn, experts_test, cntx_sampler_val, cntx_sampler_test, config,mean_across_experts=True,experts_train=experts_train)
         elif config["dataset"] == "generated_expert_labels_fashion":
@@ -914,7 +914,7 @@ def main(config):
 
         # eval(model, val_data_trgt, val_data_trgt, loss_fn, experts_test, cntx_sampler_val, cntx_sampler_val, config) # tuning MAML
     else: # evaluation on test data
-        if config["dataset"] == "generated_expert_labels" or config["dataset"] == "generated_expert_labels_gtsrb" or config["dataset"] == "generated_expert_labels_fashion":
+        if config["dataset"] == "generated_expert_labels_cifar" or config["dataset"] == "generated_expert_labels_gtsrb" or config["dataset"] == "generated_expert_labels_fashion":
             eval(model, val_data_trgt, test_data_trgt, loss_fn, experts_test, cntx_sampler_val, cntx_sampler_test, config,mean_across_experts=True,experts_train=experts_train)
         else:
             eval(model, val_data_trgt, test_data_trgt, loss_fn, experts_test, cntx_sampler_val, cntx_sampler_test, config,mean_across_experts=True)
@@ -941,7 +941,7 @@ if __name__ == "__main__":
     parser.add_argument('--scoring_rule', choices=['val_loss', 'sys_acc'], default='val_loss')
     parser.add_argument('--norm_type', choices=['batchnorm', 'frn'], default='batchnorm')
 
-    parser.add_argument("--dataset", choices=["cifar10",  "gtsrb","generated_expert_labels","generated_expert_labels_gtsrb","generated_expert_labels_fashion","fashion"], default="cifar10") 
+    parser.add_argument("--dataset", choices=["cifar10",  "gtsrb","generated_expert_labels_cifar","generated_expert_labels_gtsrb","generated_expert_labels_fashion","fashion"], default="cifar10") 
     parser.add_argument("--val_batch_size", type=int, default=8)
     parser.add_argument("--test_batch_size", type=int, default=1)
     parser.add_argument('--warmstart', action='store_true')
