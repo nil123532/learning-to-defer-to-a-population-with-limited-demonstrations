@@ -601,7 +601,7 @@ def eval(model, val_data, test_data, loss_fn, experts_test, val_cntx_sampler, te
                 val_cntx_sampler.reset()
                 model.load_state_dict(copy.deepcopy(model_state_dict))
                 #NR - Change to expert train because that's where the data is for the generated expert labels scenario
-                if config["dataset"] == "generated_expert_labels" or config["dataset"] == "generated_expert_labels_fashion":
+                if config["dataset"] == "generated_expert_labels_cifar" or config["dataset"] == "generated_expert_labels_fashion":
                     metrics = evaluate(model, experts_train, loss_fn, val_cntx_sampler, config["n_classes"], val_loader, config, None, budget, \
                                 n_steps, lr,mean_across_experts=False)
                 elif config["dataset"] == "generated_expert_labels_gtsrb":
