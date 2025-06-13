@@ -941,7 +941,7 @@ if __name__ == "__main__":
     parser.add_argument('--scoring_rule', choices=['val_loss', 'sys_acc'], default='val_loss')
     parser.add_argument('--norm_type', choices=['batchnorm', 'frn'], default='batchnorm')
 
-    parser.add_argument("--dataset", choices=["cifar10",  "gtsrb","generated_expert_labels","generated_expert_labels_gtsrb","generated_expert_labels_fashion","fashion"], default="cifar10") 
+    parser.add_argument("--dataset", choices=["cifar10",  "gtsrb","generated_expert_labels_cifar","generated_expert_labels_gtsrb","generated_expert_labels_fashion","fashion"], default="cifar10") 
     parser.add_argument("--val_batch_size", type=int, default=8)
     parser.add_argument("--test_batch_size", type=int, default=1)
     parser.add_argument('--warmstart', action='store_true')
