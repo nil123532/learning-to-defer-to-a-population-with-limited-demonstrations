@@ -54,15 +54,20 @@ def _average_metrics(list_of_dicts):
         return {}
 
     n = len(list_of_dicts)
+    # Use the first dict to get all keys and identify numeric vs. non-numeric
+    if not list_of_dicts:
+        return {}
+
     sum_dict = {}
+    # Initialize with the first dictionary to handle non-numeric types correctly
+    for k, v in list_of_dicts[0].items():
+        if not isinstance(v, (int, float)):
+            sum_dict[k] = v # Store the first non-numeric value
+
     for d in list_of_dicts:
         for k, v in d.items():
             if isinstance(v, (int, float)):
                 sum_dict[k] = sum_dict.get(k, 0.0) + v
-            else:
-                # e.g. 'cov' is 'xx/yy', keep only the first
-                if k not in sum_dict:
-                    sum_dict[k] = v
 
     # Build the average dict
     avg_dict = {}
@@ -70,237 +75,243 @@ def _average_metrics(list_of_dicts):
         if isinstance(v, (int, float)):
             avg_dict[k] = v / n
         else:
-            avg_dict[k] = v  # e.g. keep "cov" as is
+            avg_dict[k] = v  # Keep the first non-numeric value
     return avg_dict
 
 
-
-# -----------------------------------------------------------------
-# MAIN EVALUATION --------------------------------------------------
-# -----------------------------------------------------------------
-def evaluate(
-    model,
-    experts_test,
-    loss_fn,
-    cntx_sampler,
-    n_classes,
-    data_loader,
-    config,
-    logger=None,
-    budget=1.0,
-    n_finetune_steps=0,
-    lr_finetune=1e-1,
-    p_cntx_inclusion=1.0,
-    mean_across_experts=True,
-    experts_train=None,
-    train_cntx_sampler=None,
-):
+def _perform_evaluation_run(model,
+                            experts_for_run,
+                            loss_fn,
+                            cntx_sampler,
+                            n_classes,
+                            data_loader,
+                            config,
+                            budget,
+                            n_finetune_steps,
+                            lr_finetune,
+                            p_cntx_inclusion,
+                            device):
     """
-    data_loader must be instantiated with shuffle=False.
-    """
+    Performs a single, full evaluation pass over the data_loader.
+    This helper contains the core logic that was duplicated.
 
+    Args:
+        experts_for_run (list): A list of experts to use for this run.
+            - If len > 1, a random expert is chosen per batch.
+            - If len == 1, that single expert is used for all batches.
+    """
+    model.eval()
+    if config["l2d"] == 'single_maml':
+        model.train()
+
+    is_finetune = (config["l2d"] in ['single', 'single_maml']) and (n_finetune_steps > 0)
+    
+    # Backup model state if we are finetuning during evaluation
+    if is_finetune:
+        model_state_dict = copy.deepcopy(model.state_dict())
+        # The model object backup is needed if finetuning modifies more than just state_dict
+        model_backup = copy.deepcopy(model) 
+
+    # --- Initialization of accumulators ---
+    losses, confidence_diff, is_rejection = [], [], []
+    clf_predictions, exp_predictions = [], []
+    
+    # =================================================================
+    # 1. First Pass: Get model predictions and expert behaviors
+    # =================================================================
+    for data in data_loader:
+        if len(data) == 2:
+            images, labels, labels_sparse = data[0].to(device), data[1].to(device), None
+        else:
+            images, labels, labels_sparse = data[0].to(device), data[1].to(device), data[2].to(device)
+        
+        # Select expert for the batch
+        if len(experts_for_run) > 1:
+            expert = random.choice(experts_for_run)
+        else:
+            expert = experts_for_run[0]
+
+        # --- Finetuning Logic (if applicable) ---
+        if is_finetune:
+            # Prepare context for finetuning
+            expert_cntx = cntx_sampler.sample(n_experts=1)
+            cntx_yc_sparse = None if expert_cntx.yc_sparse is None else expert_cntx.yc_sparse.squeeze(0)
+            exp_preds_cntx = torch.tensor(expert(expert_cntx.xc.squeeze(0), expert_cntx.yc.squeeze(), cntx_yc_sparse), device=device)
+            expert_cntx.mc = exp_preds_cntx.unsqueeze(0)
+            
+            model.train()
+            images_cntx = expert_cntx.xc.squeeze(0)
+            targets_cntx = expert_cntx.yc.squeeze(0)
+            costs_cntx = (exp_preds_cntx == targets_cntx).int()
+
+            for _ in range(n_finetune_steps):
+                outputs_cntx = model(images_cntx, expert_cntx).squeeze(0)
+                loss = loss_fn(outputs_cntx, costs_cntx, targets_cntx, n_classes)
+                model.zero_grad()
+                loss.backward()
+                with torch.no_grad():
+                    for param in model.params.clf.parameters():
+                        param.copy_(param - lr_finetune * param.grad)
+            
+            if config["l2d"] == 'single':
+                model.eval()
+
+        # --- Prediction Logic ---
+        with torch.no_grad():
+            expert_cntx = None
+            if np.random.binomial(1, p_cntx_inclusion) == 1:
+                expert_cntx = cntx_sampler.sample(n_experts=1)
+                cntx_yc_sparse = None if expert_cntx.yc_sparse is None else expert_cntx.yc_sparse.squeeze(0)
+                exp_preds = torch.tensor(expert(expert_cntx.xc.squeeze(0), expert_cntx.yc.squeeze(), cntx_yc_sparse), device=device)
+                expert_cntx.mc = exp_preds.unsqueeze(0)
+
+            outputs = model(images, expert_cntx if config["l2d"] == 'pop' else None)
+            outputs = outputs.squeeze(0) if outputs.dim() > 2 else outputs
+
+            probs = F.sigmoid(outputs) if config["loss_type"] == "ova" else outputs
+            clf_probs, clf_preds = probs[:, :n_classes].max(dim=-1)
+            exp_probs = probs[:, n_classes]
+
+            confidence_diff.append(clf_probs - exp_probs)
+            clf_predictions.append(clf_preds)
+            is_rejection.append((outputs.max(dim=-1)[1] == n_classes).int())
+            
+            exp_pred = torch.tensor(expert(images, labels, labels_sparse), device=device)
+            m = (exp_pred == labels).int()
+            exp_predictions.append(exp_pred)
+
+            losses.append(loss_fn(outputs, m, labels, n_classes).item())
+
+        # Restore model for the next batch if finetuning was done
+        if is_finetune:
+            model = model_backup
+            model.load_state_dict(copy.deepcopy(model_state_dict))
+            if config["l2d"] == 'single': model.eval()
+            else: model.train()
+            
+    # Restore model state completely after the evaluation run
+    if is_finetune:
+        model = model_backup # a bit redundant but safe
+        model.load_state_dict(model_state_dict)
+    model.eval()
+
+    # =================================================================
+    # 2. Second Pass: Calculate metrics based on sorted predictions
+    # =================================================================
+    confidence_diff = torch.cat(confidence_diff)
+    indices_order = confidence_diff.argsort()
+
+    # Reorder all collected data
+    is_rejection = torch.cat(is_rejection)[indices_order]
+    clf_predictions = torch.cat(clf_predictions)[indices_order]
+    exp_predictions = torch.cat(exp_predictions)[indices_order]
+
+    kwargs = {'num_workers': 0, 'pin_memory': True} if device.type == 'cuda' else {}
+    data_loader_new = torch.utils.data.DataLoader(
+        torch.utils.data.Subset(data_loader.dataset, indices=indices_order),
+        batch_size=data_loader.batch_size, shuffle=False, **kwargs)
+
+    max_defer = math.floor(budget * len(data_loader.dataset))
+    
+    # --- Metric calculation ---
+    correct_sys, exp, exp_total, correct, total, real_total = 0, 0, 0, 0, 0, 0
+    clf_alone_correct, exp_alone_correct = 0, 0
+
+    for data in data_loader_new:
+        labels = data[1].to(device)
+        batch_size = len(labels)
+
+        for i in range(batch_size):
+            r = is_rejection[real_total].item()
+            # Enforce budget constraint
+            if is_rejection[:real_total].sum().item() >= max_defer:
+                r = 0
+            
+            prediction = clf_predictions[real_total].item()
+            exp_prediction = exp_predictions[real_total].item()
+            
+            clf_alone_correct += (prediction == labels[i]).item()
+            exp_alone_correct += (exp_prediction == labels[i].item())
+
+            if r == 0:  # Classifier makes the decision
+                total += 1
+                correct += (prediction == labels[i]).item()
+                correct_sys += (prediction == labels[i]).item()
+            else:  # Deferred to expert
+                exp_total += 1
+                exp += (exp_prediction == labels[i]).item()
+                correct_sys += (exp_prediction == labels[i]).item()
+            
+            real_total += 1
+
+    # --- Finalize and return metrics ---
+    cov = f"{total}/{real_total}"
+    metrics = {
+        "cov": cov,
+        "sys_acc": 100.0 * correct_sys / real_total if real_total > 0 else 0,
+        "exp_acc": 100.0 * exp / (exp_total + 1e-4),
+        "clf_acc": 100.0 * correct / (total + 1e-4),
+        "exp_acc_alone": 100.0 * exp_alone_correct / real_total if real_total > 0 else 0,
+        "clf_acc_alone": 100.0 * clf_alone_correct / real_total if real_total > 0 else 0,
+        "val_loss": np.mean(losses),
+    }
+    return metrics
+
+
+def evaluate(model,
+             experts_test,
+             loss_fn,
+             cntx_sampler,
+             n_classes,
+             data_loader,
+             config,
+             logger=None,
+             budget=1.0,
+             n_finetune_steps=0,
+             lr_finetune=1e-1,
+             p_cntx_inclusion=1.0,
+             mean_across_experts=True,
+             experts_train=None, # Not used in this function, kept for signature consistency
+             train_cntx_sampler=None): # Not used in this function, kept for signature consistency
+    """
+    Evaluates the model by dispatching to a helper function.
+    - If mean_across_experts=True, it evaluates against each expert individually and averages the results.
+    - If mean_across_experts=False, it evaluates once, picking a random expert for each batch.
+    """
     device = next(model.parameters()).device
 
-    # ------------------------------------------------------------
-    # Inner helper that evaluates on *one* expert
-    # (or a random expert per batch if pass expert=None).
-    # ------------------------------------------------------------
-    def _eval_one_expert(expert_fixed=None):
-        """
-        Returns: metrics dict for this run.
-        """
-        # bookkeeping
-        correct = correct_sys = exp = exp_total = total = 0
-        clf_alone_correct = exp_alone_correct = real_total = 0
-        losses, confidence_diff, is_rejection = [], [], []
-        clf_predictions, exp_predictions = [], []
-
-        # a fresh copy for per-run finetune
-        is_finetune = (
-            ((config["l2d"] in {"single", "single_maml"}) or n_finetune_steps > 0)
-            and n_finetune_steps > 0
+    if not mean_across_experts:
+        # Case 1: Evaluate once, picking a random expert from the test set for each batch.
+        metrics = _perform_evaluation_run(
+            model, experts_test, loss_fn, cntx_sampler, n_classes, data_loader,
+            config, budget, n_finetune_steps, lr_finetune, p_cntx_inclusion, device
         )
-        if is_finetune:
-            model_backup = copy.deepcopy(model)
-            model_state = copy.deepcopy(model.state_dict())
-
-        # ----------------- loop over batches -----------------
-        for data in data_loader:
-            # unpack batch (with or w/out index)
-            if len(data) == 2:
-                images, labels = data
-                index = None
-            else:
-                images, labels, index = data
-            images, labels = images.to(device), labels.to(device)
-            if index is not None:
-                index = index.to(device)
-
-            # choose which expert to use for THIS batch
-            expert = (
-                expert_fixed
-                if expert_fixed is not None
-                else random.choice(experts_test)
-            )
-
-            # ---------- build context for that expert ----------
-            expert_cntx = cntx_sampler.sample(n_experts=1)
-            cntx_yc_index = (
-                None
-                if expert_cntx.yc_index is None
-                else expert_cntx.yc_index.squeeze(0)
-            )
-            exp_preds_ctx = torch.tensor(
-                expert(
-                    expert_cntx.xc.squeeze(0),
-                    expert_cntx.yc.squeeze(),
-                    cntx_yc_index,
-                ),
-                device=device,
-            )
-            expert_cntx.mc = exp_preds_ctx.unsqueeze(0)
-
-            # --------- optional finetune on this context --------
-            if is_finetune:
-                model.train()
-                images_cntx = expert_cntx.xc.squeeze(0)
-                targets_cntx = expert_cntx.yc.squeeze(0)
-                costs = (exp_preds_ctx == targets_cntx).int()
-                for _ in range(n_finetune_steps):
-                    out_cntx = model(images_cntx).squeeze(0)
-                    loss = loss_fn(out_cntx, costs, targets_cntx, n_classes)
-                    model.zero_grad()
-                    loss.backward()
-                    with torch.no_grad():
-                        for p in model.params.clf.parameters():
-                            p -= lr_finetune * p.grad
-
-                # switch back to eval/inference mode
-                if config["l2d"] == "single":
-                    model.eval()
-
-            # --------------- inference on main batch ---------------
-            with torch.no_grad():
-                if np.random.binomial(1, p_cntx_inclusion) == 0:
-                    expert_cntx = None  # drop context with prob 1-p
-
-                outputs = (
-                    model(images, expert_cntx).squeeze(0)
-                    if config["l2d"] == "pop"
-                    else model(images)
-                )
-
-                probs = (
-                    torch.sigmoid(outputs)
-                    if config["loss_type"] == "ova"
-                    else outputs
-                )
-
-                clf_probs, clf_preds = probs[:, :n_classes].max(dim=-1)
-                exp_probs = probs[:, n_classes]
-                confidence_diff.append(clf_probs - exp_probs)
-                clf_predictions.append(clf_preds)
-
-                _, predicted = outputs.max(dim=-1)
-                is_rejection.append((predicted == n_classes).int())
-
-                exp_pred = torch.tensor(
-                    expert(images, labels, index), device=device
-                )
-                m = (exp_pred == labels).int()
-                exp_predictions.append(exp_pred)
-
-                losses.append(loss_fn(outputs, m, labels, n_classes).item())
-
-            # -------- revert fine-tuning tweaks (if any) ----------
-            if is_finetune:
-                model.load_state_dict(model_state)
-                model.train() if config["l2d"] != "single" else model.eval()
-
-        # ---------- defer-ranking pass ----------
-        confidence_diff = torch.cat(confidence_diff)
-        order = confidence_diff.argsort()
-
-        is_rejection = torch.cat(is_rejection)[order]
-        clf_predictions = torch.cat(clf_predictions)[order]
-        exp_predictions = torch.cat(exp_predictions)[order]
-
-        data_loader_ranked = torch.utils.data.DataLoader(
-            torch.utils.data.Subset(data_loader.dataset, order),
-            batch_size=data_loader.batch_size,
-            shuffle=False,
-            num_workers=0,
-            pin_memory=True,
-        )
-
-        max_defer = math.floor(budget * len(data_loader.dataset))
-
-        for batch in data_loader_ranked:
-            if len(batch) == 2:
-                images, labels = batch
-            else:
-                images, labels, _ = batch
-            labels = labels.to(device)
-            batch_size = len(labels)
-
-            for i in range(batch_size):
-                if is_rejection[:real_total].sum() >= max_defer:
-                    r = 0
-                else:
-                    r = is_rejection[real_total].item()
-
-                pred_clf = clf_predictions[real_total].item()
-                pred_exp = exp_predictions[real_total].item()
-                label_i = labels[i].item()
-
-                clf_alone_correct += (pred_clf == label_i)
-                exp_alone_correct += (pred_exp == label_i)
-
-                if r == 0:
-                    total += 1
-                    correct += (pred_clf == label_i)
-                    correct_sys += (pred_clf == label_i)
-                else:
-                    exp += (pred_exp == label_i)
-                    correct_sys += (pred_exp == label_i)
-                    exp_total += 1
-
-                real_total += 1
-
-        cov_str = f"{total}/{real_total}"
-        return {
-            "cov": cov_str,
-            "sys_acc": 100 * correct_sys / real_total,
-            "exp_acc": 100 * exp / (exp_total + 1e-4),
-            "clf_acc": 100 * correct / (total + 1e-4),
-            "exp_acc_alone": 100 * exp_alone_correct / real_total,
-            "clf_acc_alone": 100 * clf_alone_correct / real_total,
-            "val_loss": float(np.mean(losses)),
-        }
-
-    # ============================================================
-    #              RUN: single expert OR average over many
-    # ============================================================
-    if mean_across_experts:
-        metrics_list = [_eval_one_expert(e) for e in experts_test]
-        final_metrics = _average_metrics(metrics_list)
-        msg_prefix = "[Average across experts] "
+        msg = "[Single Run] "
+    
     else:
-        # pass None ⇒ sample a random expert each batch (original logic)
-        final_metrics = _eval_one_expert(None)
-        msg_prefix = "[Single-pass random expert] "
+        # Case 2: Evaluate N times (once for each expert) and average the metrics.
+        print("Mean across experts")
+        list_of_metrics = []
+        for expert in experts_test:
+            metrics_e = _perform_evaluation_run(
+                model, [expert], loss_fn, cntx_sampler, n_classes, data_loader,
+                config, budget, n_finetune_steps, lr_finetune, p_cntx_inclusion, device
+            )
+            list_of_metrics.append(metrics_e)
+        
+        metrics = _average_metrics(list_of_metrics)
+        msg = "[Average across experts] "
 
-    # ------------ logging / printing -------------
-    msg = msg_prefix + " ".join(
-        f"{k} {v}" if isinstance(v, str) else f"{k} {v:.6f}"
-        for k, v in final_metrics.items()
-    )
+    # --- Logging ---
+    for k, v in metrics.items():
+        msg += f"{k} {v:.6f} " if isinstance(v, float) else f"{k} {v} "
+    
     if logger is not None:
         logger.info(msg)
     else:
         print(msg)
-
-    return final_metrics
+        
+    return metrics
 
             
 
