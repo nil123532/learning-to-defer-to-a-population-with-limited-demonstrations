@@ -1,3 +1,4 @@
+pop_attn
 bash train_generated_experts.sh pop_attn 1 train 0 500 lf && 
 bash train_generated_experts.sh pop_attn 5 train 0 500 lf &&
 bash train_generated_experts.sh pop_attn 9 train 0 500 lf &&
@@ -21,3 +22,45 @@ bash train_generated_experts_fashion.sh pop_attn 9 train 0 500 lf &&
 bash fashion.sh pop_attn  1 train 0 500 w &&
 bash fashion.sh pop_attn  5 train 0 500 w &&
 bash fashion.sh pop_attn  9 train 0 500 w
+
+
+pop
+bash train_generated_experts_cifar.sh pop 1 train 0 500 w && 
+bash train_generated_experts_cifar.sh pop 5 train 0 500 w &&
+bash train_generated_experts_cifar.sh pop 9 train 0 500 w &&
+bash train_cifar10.sh pop  1 train 0 500 w &&
+bash train_cifar10.sh pop  5 train 0 500 w &&
+bash train_cifar10.sh pop  9 train 0 500 w &&
+bash train_generated_experts_gtsrb.sh pop 4 train 0 473 w && 
+bash train_generated_experts_gtsrb.sh pop 21 train 0 473 w &&
+bash train_generated_experts_gtsrb.sh pop 38 train 0 473 w &&
+bash train_gtsrb.sh pop  1 train 0 473 w &&
+bash train_gtsrb.sh pop  5 train 0 473 w &&
+bash train_gtsrb.sh pop  9 train 0 473 w &&
+bash train_generated_experts_fashion.sh pop 1 train 0 500 w && 
+bash train_generated_experts_fashion.sh pop 5 train 0 500 w &&
+bash train_generated_experts_fashion.sh pop 9 train 0 500 w &&
+bash fashion.sh pop  1 train 0 500 w &&
+bash fashion.sh pop  5 train 0 500 w &&
+bash fashion.sh pop  9 train 0 500 w 
+
+
+single 
+bash train_generated_experts_cifar.sh single 1 train 0 500 w && 
+bash train_generated_experts_cifar.sh single 5 train 0 500 w &&
+bash train_generated_experts_cifar.sh single 9 train 0 500 w &&
+bash train_cifar10.sh single  1 train 0 500 w &&
+bash train_cifar10.sh single  5 train 0 500 w &&
+bash train_cifar10.sh single  9 train 0 500 w &&
+bash train_generated_experts_gtsrb.sh single 4 train 0 473 w && 
+bash train_generated_experts_gtsrb.sh single 21 train 0 473 w &&
+bash train_generated_experts_gtsrb.sh single 38 train 0 473 w &&
+bash train_gtsrb.sh single  1 train 0 473 w &&
+bash train_gtsrb.sh single  5 train 0 473 w &&
+bash train_gtsrb.sh single  9 train 0 473 w &&
+bash train_generated_experts_fashion.sh single 1 train 0 500 w && 
+bash train_generated_experts_fashion.sh single 5 train 0 500 w &&
+bash train_generated_experts_fashion.sh single 9 train 0 500 w &&
+bash fashion.sh single  1 train 0 500 w &&
+bash fashion.sh single  5 train 0 500 w &&
+bash fashion.sh single  9 train 0 500 w 
