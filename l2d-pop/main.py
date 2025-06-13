@@ -135,8 +135,8 @@ def _perform_evaluation_run(model,
         if is_finetune:
             # Prepare context for finetuning
             expert_cntx = cntx_sampler.sample(n_experts=1)
-            cntx_yc_sparse = None if expert_cntx.yc_sparse is None else expert_cntx.yc_sparse.squeeze(0)
-            exp_preds_cntx = torch.tensor(expert(expert_cntx.xc.squeeze(0), expert_cntx.yc.squeeze(), cntx_yc_sparse), device=device)
+            cntx_yc_index = None if expert_cntx.yc_index is None else expert_cntx.yc_index.squeeze(0)
+            exp_preds_cntx = torch.tensor(expert(expert_cntx.xc.squeeze(0), expert_cntx.yc.squeeze(), cntx_yc_index), device=device)
             expert_cntx.mc = exp_preds_cntx.unsqueeze(0)
             
             model.train()
@@ -145,7 +145,7 @@ def _perform_evaluation_run(model,
             costs_cntx = (exp_preds_cntx == targets_cntx).int()
 
             for _ in range(n_finetune_steps):
-                outputs_cntx = model(images_cntx, expert_cntx).squeeze(0)
+                outputs_cntx = model(images_cntx)
                 loss = loss_fn(outputs_cntx, costs_cntx, targets_cntx, n_classes)
                 model.zero_grad()
                 loss.backward()
@@ -161,12 +161,15 @@ def _perform_evaluation_run(model,
             expert_cntx = None
             if np.random.binomial(1, p_cntx_inclusion) == 1:
                 expert_cntx = cntx_sampler.sample(n_experts=1)
-                cntx_yc_sparse = None if expert_cntx.yc_sparse is None else expert_cntx.yc_sparse.squeeze(0)
-                exp_preds = torch.tensor(expert(expert_cntx.xc.squeeze(0), expert_cntx.yc.squeeze(), cntx_yc_sparse), device=device)
+                cntx_yc_index = None if expert_cntx.yc_index is None else expert_cntx.yc_index.squeeze(0)
+                exp_preds = torch.tensor(expert(expert_cntx.xc.squeeze(0), expert_cntx.yc.squeeze(), cntx_yc_index), device=device)
                 expert_cntx.mc = exp_preds.unsqueeze(0)
 
-            outputs = model(images, expert_cntx if config["l2d"] == 'pop' else None)
-            outputs = outputs.squeeze(0) if outputs.dim() > 2 else outputs
+
+            if config["l2d"] == 'pop':
+                outputs = model(images, expert_cntx).squeeze(0)
+            elif config["l2d"] == 'single':
+                outputs = model(images)
 
             probs = F.sigmoid(outputs) if config["loss_type"] == "ova" else outputs
             clf_probs, clf_preds = probs[:, :n_classes].max(dim=-1)
