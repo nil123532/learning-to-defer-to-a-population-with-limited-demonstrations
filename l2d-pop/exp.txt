@@ -20,9 +20,9 @@ bash fashion.sh pop_attn  9 eval 0 500 w
 
 
 pop
-bash train_generated_experts_cifar.sh pop 1 train 0 500 w && 
-bash train_generated_experts_cifar.sh pop 5 train 0 500 w &&
-bash train_generated_experts_cifar.sh pop 9 train 0 500 w &&
+bash train_generated_experts_cifar.sh pop 1 eval 0 500 w && 
+bash train_generated_experts_cifar.sh pop 5 eval 0 500 w &&
+bash train_generated_experts_cifar.sh pop 9 eval 0 500 w &&
 bash train_cifar10.sh pop  1 train 0 500 w &&
 bash train_cifar10.sh pop  5 train 0 500 w &&
 bash train_cifar10.sh pop  9 train 0 500 w &&
