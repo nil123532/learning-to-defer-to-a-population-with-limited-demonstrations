@@ -121,9 +121,9 @@ def _perform_evaluation_run(model,
     # =================================================================
     for data in data_loader:
         if len(data) == 2:
-            images, labels, labels_sparse = data[0].to(device), data[1].to(device), None
+            images, labels, yc_index = data[0].to(device), data[1].to(device), None
         else:
-            images, labels, labels_sparse = data[0].to(device), data[1].to(device), data[2].to(device)
+            images, labels, yc_index = data[0].to(device), data[1].to(device), data[2].to(device)
         
         # Select expert for the batch
         if len(experts_for_run) > 1:
@@ -179,7 +179,7 @@ def _perform_evaluation_run(model,
             clf_predictions.append(clf_preds)
             is_rejection.append((outputs.max(dim=-1)[1] == n_classes).int())
             
-            exp_pred = torch.tensor(expert(images, labels, labels_sparse), device=device)
+            exp_pred = torch.tensor(expert(images, labels, yc_index), device=device)
             m = (exp_pred == labels).int()
             exp_predictions.append(exp_pred)
 
@@ -766,7 +766,7 @@ def main(config):
     #Fashionmnist - sparse labels
     elif config["dataset"] == "fashion":
         config["n_classes"] = 10
-        train_data, val_data, test_data = load_fashion_mnist()
+        train_data, val_data, test_data = load_fashion_mnist(expert_type="limited_demo")
         resnet_base = WideResNetBase(depth=28, n_channels=3, widen_factor=2, dropRate=0.0, norm_type=config["norm_type"])
         n_features = resnet_base.nChannels
 
