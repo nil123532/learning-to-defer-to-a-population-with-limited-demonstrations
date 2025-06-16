@@ -876,7 +876,7 @@ def main(config):
         
 
     # Context sampler val/test-time: partition val/test sets
-    prop_cntx = 0.2
+    prop_cntx = 0.2 if config["dataset"].startswith("generated_expert_labels") else 0.05
     val_cntx_size = int(prop_cntx * len(val_data))
 
 
