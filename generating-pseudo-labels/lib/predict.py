@@ -129,7 +129,7 @@ def plot_confusion_matrix(y_true, y_pred, name):
 
 
 def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u, testloader,
-                      expert,expert_bin,train_cntx_sampler,test_cntx_sampler,id):
+                      expert,expert_bin,train_cntx_sampler,test_cntx_sampler,id,finetune):
     """
     Generate predictions for CIFAR (storing each sample exactly once),
     and compute "unique" accuracy for each loader (train_x, train_u, val).
@@ -193,7 +193,8 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
     # ---------------------------
     best_steps, best_lr = 0, 0
     fmodel = model if ema_model is None else ema_model  
-    best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
+    if finetune:
+        best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
 
     orig_state = copy.deepcopy(model.state_dict())
 
@@ -383,7 +384,7 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
 
 
 def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u, testloader,
-                      expert,expert_bin,train_cntx_sampler,test_cntx_sampler,id):
+                      expert,expert_bin,train_cntx_sampler,test_cntx_sampler,id,finetune):
     """
     Generate predictions for GTSRB (storing each sample exactly once),
     and compute "unique" accuracy for each loader (train_x, train_u, val).
@@ -446,7 +447,8 @@ def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
     # ---------------------------
     best_steps, best_lr = 0, 0
     fmodel = model if ema_model is None else ema_model  
-    best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
+    if finetune:
+        best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
 
 
     orig_state = copy.deepcopy(model.state_dict())
@@ -635,7 +637,7 @@ def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
 
 
 def predict_fashion_acc(model, ema_model, emb_model, trainloader_x, trainloader_u, testloader,
-                      expert,expert_bin,train_cntx_sampler,test_cntx_sampler):
+                      expert,expert_bin,train_cntx_sampler,test_cntx_sampler,finetune):
     """
     Generate predictions for GTSRB (storing each sample exactly once),
     and compute "unique" accuracy for each loader (train_x, train_u, val).
@@ -699,7 +701,8 @@ def predict_fashion_acc(model, ema_model, emb_model, trainloader_x, trainloader_
     # ---------------------------
     best_steps, best_lr = 0, 0
     fmodel = model if ema_model is None else ema_model  
-    best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
+    if finetune:
+        best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
 
 
     orig_state = copy.deepcopy(model.state_dict())

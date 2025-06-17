@@ -439,9 +439,11 @@ def main():
     parser.add_argument('--deeper',default=False,type=bool,help='Deeper net maybe')
     parser.add_argument('--with-attn',type=str,default="attn")
 
+    #NR - Finetune 
+    parser.add_argument('--finetune', default=False, action='store_true', help='Finetune the model')
+
     args = parser.parse_args()
 
-    #NR - model architecture 
     
     logger, output_dir = setup_default_logging(args)
     logger.info(dict(args._get_kwargs()))
@@ -771,7 +773,7 @@ def main():
         for idx_exp, expert in enumerate(experts_train):
             print("Expert:",idx_exp+1)
             predictions, accs = predict_cifar_acc(model, ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert,
-                                                  experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,idx_exp)   
+                                                  experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,idx_exp,args.finetune)   
             logger.info(f"Train_u accuracy: {accs['train_u']:.4f}")
             logger.info(f"Validation accuracy: {accs['val']:.4f}")
             if not os.path.exists('./artificial_expert_labels/'):
@@ -783,7 +785,7 @@ def main():
         for idx_exp, expert_test in enumerate(experts_test[-5:]):
 
             predictions, accs = predict_cifar_acc(model,ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert_test,
-                                                  experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,idx_exp+15)   
+                                                  experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,idx_exp+15,args.finetune)   
             logger.info(f"Train_u accuracy: {accs['train_u']:.4f}")
             logger.info(f"Validation accuracy: {accs['val']:.4f}")
             if not os.path.exists('./artificial_expert_labels/'):
@@ -796,7 +798,7 @@ def main():
         for idx_exp, expert in enumerate(experts_train):
                 print("Expert:",idx_exp+1)
                 predictions, accs = predict_gtsrb_acc(model, ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert,
-                                                    experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,idx_exp)   
+                                                    experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,idx_exp,args.finetune)   
         
                 if not os.path.exists('./artificial_expert_labels/'):
                     os.makedirs('./artificial_expert_labels/')
@@ -809,7 +811,7 @@ def main():
         for idx_exp, expert_test in enumerate(experts_test[-5:]):
 
             predictions, accs = predict_gtsrb_acc(model,ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert_test,
-                                                    experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,idx_exp+15)   
+                                                    experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,idx_exp+15,args.finetune)   
 
             if not os.path.exists('./artificial_expert_labels/'):
                 os.makedirs('./artificial_expert_labels/')
@@ -824,7 +826,7 @@ def main():
             print("Expert:",idx_exp+1)
             
             predictions, accs = predict_fashion_acc(model, ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert,
-                                                  experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler)   
+                                                  experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,args.finetune)   
      
             if not os.path.exists('./artificial_expert_labels/'):
                 os.makedirs('./artificial_expert_labels/')
@@ -837,7 +839,7 @@ def main():
         for idx_exp, expert_test in enumerate(experts_test[-5:]):
 
             predictions, accs = predict_fashion_acc(model,ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert_test,
-                                                  experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler)   
+                                                  experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,args.finetune)   
 
             if not os.path.exists('./artificial_expert_labels/'):
                 os.makedirs('./artificial_expert_labels/')
