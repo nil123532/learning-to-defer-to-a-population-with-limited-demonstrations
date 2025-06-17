@@ -402,7 +402,7 @@ def main():
     parser.add_argument('--mu', type=int, default=7,
                         help='factor of train batch size of unlabeled samples')
     
-    parser.add_argument('--eval-ema', default=True, help='whether to use ema model for evaluation')
+    parser.add_argument('--eval-ema', default=False, help='whether to use ema model for evaluation')
     parser.add_argument('--ema-m', type=float, default=0.999)    
 
     parser.add_argument('--n-imgs-per-epoch', type=int, default=64 * 1024,
@@ -704,10 +704,6 @@ def main():
     logger.info('-----------start training--------------')
     class_names = [str(i) for i in range(args.n_classes)]
 
-    #No need to finetune 
-    steps_grid = [0]             
-    lr_grid    = [0]
-
     for epoch in range(start_epoch, args.n_epoches):
         loss_x, loss_u, mask_mean, guess_label_acc, prob_list = train_one_epoch(epoch, **train_args)
 
@@ -718,38 +714,27 @@ def main():
 
         if epoch % 5 == 0:
             records = []
-            for steps, lr_finetune in product(steps_grid, lr_grid):
-                top1, ema_top1, f05_model, f05_ema, cm_model = evaluate_merged(model,ema_model,emb_model,dlval,criteria_x,beta=0.5,
-                                                                               experts_test=experts_test,cntx=val_cntx_sampler,
-                                                                               experts_test_bin=experts_test_bin,steps=steps,lr_finetune=lr_finetune,
-                                                                               with_attn=args.with_attn)
-                records.append({"steps": steps, "lr": lr_finetune, "top1": top1,
-                    "ema_top1": ema_top1, "f05_model": f05_model, "f05_ema": f05_ema}
-                )
+            top1, ema_top1, f05_model, f05_ema, cm_model = evaluate_merged(model,ema_model,emb_model,dlval,criteria_x,beta=0.5,
+                                                                            experts_test=experts_test,cntx=val_cntx_sampler,
+                                                                            experts_test_bin=experts_test_bin)
+       
 
-            results_df = pd.DataFrame(records)
-            # print(results_df)
-            # ---- find best combination ------------------------------------------------
-            best_idx  = results_df["ema_top1"].idxmax()       # index of highest accuracy
-            best_row  = results_df.loc[best_idx]
+         
 
-            # print(f"Best top-1 accuracy: {best_row.top1:.4f} "
-            #     f"achieved with steps = {best_row.steps} and lr = {best_row.lr:.6f}")
-            
             tb_logger.add_scalar('test_acc', top1, epoch)
-            tb_logger.add_scalar('test_ema_acc', ema_top1, epoch)
+            # tb_logger.add_scalar('test_ema_acc', ema_top1, epoch)
             tb_logger.add_scalar('f_score',f05_model,epoch)
             fig = plot_confusion_matrix(cm_model, class_names, 
                                    f'Model Confusion Matrix (Epoch {epoch})')
             tb_logger.add_figure('Confusion_Matrix/Model', fig, epoch)
             
-            if best_row.top1 >= best_acc + 0.02:
+            if top1 >= best_acc + 0.02:
                 # It's an improvement of >= 2%, so update best_acc
-                best_acc = best_row.ema_top1
+                best_acc = top1
                 best_epoch = epoch
                 save_obj = {
                     'model': model.state_dict(),
-                    'ema_model': ema_model.state_dict(),
+                    'ema_model': ema_model.state_dict() if ema_model is not None else None,
                     'optimizer': optim.state_dict(),
                     'lr_scheduler': lr_schdlr.state_dict(),
                     'prob_list': prob_list,
@@ -758,22 +743,27 @@ def main():
                 }
                 torch.save(save_obj, os.path.join(output_dir, 'ckp.latest'))
             else:
-                print("Current acc:",best_row.ema_top1)
+                print("Current acc:", top1)
                 logger.info(
                     f"Accuracy did not improve by +0.02 from previous best ({best_acc:.3f}). "
                     "Stopping training early."
                 )
                 break  # Stop the entire training loop here.
-
-            logger.info("Epoch {}. Acc: {:.4f}. Ema-Acc: {:.4f}. best_acc: {:.4f} in epoch{}".
-                        format(epoch, best_row.top1, ema_top1, best_acc, best_epoch))
-            logger.info("Epoch {}. F0.5: {:.4f}. Ema-F0.5: {:.4f}".format(epoch, f05_model, f05_ema))
+            
+            if ema_model is not None:
+                logger.info("Epoch {}. Acc: {:.4f}. Ema-Acc: {:.4f}. best_acc: {:.4f} in epoch{}".
+                            format(epoch, top1, ema_top1, best_acc, best_epoch))
+                logger.info("Epoch {}. F0.5: {:.4f}. Ema-F0.5: {:.4f}".format(epoch, f05_model, f05_ema))
+            else:
+                logger.info("Epoch {}. Acc: {:.4f}. best_acc: {:.4f} in epoch{}".
+                            format(epoch, top1, best_acc, best_epoch))
+                logger.info("Epoch {}. F0.5: {:.4f}".format(epoch, f05_model))
 
     if 'cifar' in args.dataset.lower():
         for idx_exp, expert in enumerate(experts_train):
             print("Expert:",idx_exp+1)
             predictions, accs = predict_cifar_acc(model, ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert,
-                                                  experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,idx_exp,args.finetune)   
+                                                  experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,idx_exp,args)   
             logger.info(f"Train_u accuracy: {accs['train_u']:.4f}")
             logger.info(f"Validation accuracy: {accs['val']:.4f}")
             if not os.path.exists('./artificial_expert_labels/'):
@@ -785,7 +775,7 @@ def main():
         for idx_exp, expert_test in enumerate(experts_test[-5:]):
 
             predictions, accs = predict_cifar_acc(model,ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert_test,
-                                                  experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,idx_exp+15,args.finetune)   
+                                                  experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,idx_exp+15,args)   
             logger.info(f"Train_u accuracy: {accs['train_u']:.4f}")
             logger.info(f"Validation accuracy: {accs['val']:.4f}")
             if not os.path.exists('./artificial_expert_labels/'):
@@ -798,7 +788,7 @@ def main():
         for idx_exp, expert in enumerate(experts_train):
                 print("Expert:",idx_exp+1)
                 predictions, accs = predict_gtsrb_acc(model, ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert,
-                                                    experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,idx_exp,args.finetune)   
+                                                    experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,idx_exp,args)   
         
                 if not os.path.exists('./artificial_expert_labels/'):
                     os.makedirs('./artificial_expert_labels/')
@@ -811,7 +801,7 @@ def main():
         for idx_exp, expert_test in enumerate(experts_test[-5:]):
 
             predictions, accs = predict_gtsrb_acc(model,ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert_test,
-                                                    experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,idx_exp+15,args.finetune)   
+                                                    experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,idx_exp+15,args)   
 
             if not os.path.exists('./artificial_expert_labels/'):
                 os.makedirs('./artificial_expert_labels/')
@@ -826,7 +816,7 @@ def main():
             print("Expert:",idx_exp+1)
             
             predictions, accs = predict_fashion_acc(model, ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert,
-                                                  experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,args.finetune)   
+                                                  experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,args)   
      
             if not os.path.exists('./artificial_expert_labels/'):
                 os.makedirs('./artificial_expert_labels/')
@@ -839,7 +829,7 @@ def main():
         for idx_exp, expert_test in enumerate(experts_test[-5:]):
 
             predictions, accs = predict_fashion_acc(model,ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert_test,
-                                                  experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,args.finetune)   
+                                                  experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,args)   
 
             if not os.path.exists('./artificial_expert_labels/'):
                 os.makedirs('./artificial_expert_labels/')

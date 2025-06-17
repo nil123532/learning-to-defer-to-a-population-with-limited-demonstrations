@@ -12,7 +12,6 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from matplotlib import pyplot as plt
 import seaborn as sns
 
-
 def find_best_lr_and_steps(model,emb_model,loader,expert,experts_bin,cntx_sampler):
 
     steps_grid = [0,1,2,5,10,20]
@@ -91,45 +90,9 @@ def find_best_lr_and_steps(model,emb_model,loader,expert,experts_bin,cntx_sample
     best_row = df.loc[best_idx]
 
     return best_row['steps'], best_row['lr']
-    
-def plot_confusion_matrix(y_true, y_pred, name):    
-    common_ids = sorted(y_pred.keys())           # ensure same order
-    y_true = np.array([y_true[i] for i in common_ids])
-    y_pred = np.array([y_pred[i]  for i in common_ids])
-    y_true = y_true.tolist()
-    y_pred = y_pred.tolist()
-
-    T = np.zeros((43,43))
-
-    for i in range(len(y_true)):
-        T[y_true[i]][y_pred[i]] += 1
-    # # Normalize the rows to get probabilities
-    # for i in range(10):
-    #     if np.sum(T[i]) > 0:
-    #         T[i] /= np.sum(T[i])
-
-    class_names = [str(i) for i in range(43)]
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(
-        T,
-        annot=True,
-        fmt='.3f',
-        cmap='Blues',
-        xticklabels=class_names,
-        yticklabels=class_names
-    )
-    plt.xlabel('Predicted Label')
-    plt.ylabel('True Label')
-    plt.title('Noise Transition Matrix')
-    plt.tight_layout()
-    out_path = f"confusion_matrix_{name}.png"            # change if you prefer
-    plt.savefig(out_path)
-    plt.close()                                       # free resources
-
-
 
 def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u, testloader,
-                      expert,expert_bin,train_cntx_sampler,test_cntx_sampler,id,finetune):
+                      expert,expert_bin,train_cntx_sampler,test_cntx_sampler,id,args):
     """
     Generate predictions for CIFAR (storing each sample exactly once),
     and compute "unique" accuracy for each loader (train_x, train_u, val).
@@ -185,16 +148,14 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
 
         
 
-    #fix lr and steps to be 0 
 
 
     # ---------------------------
     # 2) TRAIN UNLABELED (dltrain_u)
     # ---------------------------
     best_steps, best_lr = 0, 0
-    fmodel = model if ema_model is None else ema_model  
-    if finetune:
-        best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
+    if args.finetune:
+        best_steps, best_lr = find_best_lr_and_steps(model,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
 
     orig_state = copy.deepcopy(model.state_dict())
 
@@ -205,8 +166,7 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
             ims_weak = ims_weak.cuda()
             lbs = lbs.cuda()
 
-            #finetune stuff
-            
+            #context stuff
             expert_cntx = train_cntx_sampler.sample(n_experts = 1)
             cntx_yc_index = None if expert_cntx.yc_index is None else expert_cntx.yc_index.squeeze(0)
             exp_preds = torch.tensor(expert(expert_cntx.xc.squeeze(0), expert_cntx.yc.squeeze(), cntx_yc_index)).cuda()
@@ -219,9 +179,10 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
             em    = em_flat.view(E, NC, -1) # [E,Nc,1280]
             expert_cntx.em = em
             model.train()
-
+            
+            #finetuning
             for _ in range(best_steps):
-                output = model(em.squeeze(0),expert_cntx).squeeze(0) if ema_model is None else ema_model(em.squeeze(0), expert_cntx).squeeze(0)
+                output = model(em.squeeze(0),expert_cntx).squeeze(0)
                 targets = torch.tensor(expert_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
                 loss = torch.nn.CrossEntropyLoss()(output, targets)
                 model.zero_grad()
@@ -231,7 +192,8 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
                         new_param = param - best_lr * param.grad
                         param.copy_(new_param)
 
-            # Forward pass
+
+            # Forward pass - Evaluation model
             model.eval()
             with torch.no_grad():
                 embeddings = emb_model.get_embedding(ims_weak)
@@ -258,7 +220,7 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
                 predictions_dict['train'][idx] = pred
                 unique_idx_train.add(idx)
             
-            model.load_state_dict(orig_state, strict=True)  # Restore original model state  
+            model.load_state_dict(orig_state, strict=True)  # Restore original model state 
 
 
 
@@ -283,7 +245,7 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
             ims = ims.cuda()
             lbs = lbs.cuda()
 
-            #finetune stuff
+            #context stuff
            
             expert_cntx = test_cntx_sampler.sample(n_experts = 1)
             cntx_yc_index = None if expert_cntx.yc_index is None else expert_cntx.yc_index.squeeze(0)
@@ -297,10 +259,10 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
             em    = em_flat.view(E, NC, -1) # [E,Nc,1280]
             expert_cntx.em = em
 
-
+            #finetune stuff
             model.train()
             for _ in range(best_steps):
-                output = model(em.squeeze(0),expert_cntx).squeeze(0) if ema_model is None else ema_model(em.squeeze(0), expert_cntx).squeeze(0)
+                output = model(em.squeeze(0),expert_cntx).squeeze(0)
                 targets = torch.tensor(expert_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
                 loss = torch.nn.CrossEntropyLoss()(output, targets)
                 model.zero_grad()
@@ -311,7 +273,7 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
                         param.copy_(new_param)
             
 
-            # Forward pass
+            # Forward pass - Evaluation
             model.eval()
             with torch.no_grad():
                 embeddings = emb_model.get_embedding(ims)
@@ -345,7 +307,7 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
 
 
 
-            model.load_state_dict(orig_state, strict=True)  # Restore original model state  
+            model.load_state_dict(orig_state, strict=True)  # Restore original model state
 
 
         # Compute unique-sample accuracy for validation/test
@@ -384,7 +346,7 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
 
 
 def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u, testloader,
-                      expert,expert_bin,train_cntx_sampler,test_cntx_sampler,id,finetune):
+                      expert,expert_bin,train_cntx_sampler,test_cntx_sampler,id,args):
     """
     Generate predictions for GTSRB (storing each sample exactly once),
     and compute "unique" accuracy for each loader (train_x, train_u, val).
@@ -446,9 +408,8 @@ def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
     # 2) TRAIN UNLABELED (dltrain_u)
     # ---------------------------
     best_steps, best_lr = 0, 0
-    fmodel = model if ema_model is None else ema_model  
-    if finetune:
-        best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
+    if args.finetune:
+        best_steps, best_lr = find_best_lr_and_steps(model,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
 
 
     orig_state = copy.deepcopy(model.state_dict())
@@ -637,7 +598,7 @@ def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
 
 
 def predict_fashion_acc(model, ema_model, emb_model, trainloader_x, trainloader_u, testloader,
-                      expert,expert_bin,train_cntx_sampler,test_cntx_sampler,finetune):
+                      expert,expert_bin,train_cntx_sampler,test_cntx_sampler,args):
     """
     Generate predictions for GTSRB (storing each sample exactly once),
     and compute "unique" accuracy for each loader (train_x, train_u, val).
@@ -700,9 +661,8 @@ def predict_fashion_acc(model, ema_model, emb_model, trainloader_x, trainloader_
     # 2) TRAIN UNLABELED (dltrain_u)
     # ---------------------------
     best_steps, best_lr = 0, 0
-    fmodel = model if ema_model is None else ema_model  
-    if finetune:
-        best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
+    if args.finetune:
+        best_steps, best_lr = find_best_lr_and_steps(model,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
 
 
     orig_state = copy.deepcopy(model.state_dict())

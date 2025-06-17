@@ -6,7 +6,7 @@ from sklearn.metrics import fbeta_score, confusion_matrix
 from lib.utils import AverageMeter, accuracy
 from sklearn.metrics import fbeta_score, confusion_matrix
 
-def evaluate_merged(model, ema_model, emb_model, dataloader, criterion, beta=0.5,experts_test=None,cntx=None,experts_test_bin=None,steps=20,lr_finetune=0.01,with_attn='mlp'):
+def evaluate_merged(model, ema_model, emb_model, dataloader, criterion, beta=0.5,experts_test=None,cntx=None,experts_test_bin=None):
     """Evaluate model and ema_model on validation set, computing accuracy and F0.5 score.
 
     Args:
@@ -40,13 +40,6 @@ def evaluate_merged(model, ema_model, emb_model, dataloader, criterion, beta=0.5
     ema_preds = [] if ema_model is not None else None
     true_labels = []
 
-    #finetune stuff 
-    initial_state = copy.deepcopy(model.state_dict())  # Store initial model state   
-    finetune_steps = steps
-    lr_finetune = lr_finetune
-
-    orig_state = {k: v.detach().clone()      # true copy, no shared storage
-              for k, v in model.state_dict().items()}
 
     for ims, lbs, im_id in dataloader:
         ims, lbs_orig = ims.cuda(), lbs.cuda()
@@ -68,19 +61,7 @@ def evaluate_merged(model, ema_model, emb_model, dataloader, criterion, beta=0.5
     
 
 
-        model.train()
-        for _ in range(finetune_steps):
-            output = model(em.squeeze(0),expert_cntx).squeeze(0)
-            targets = torch.tensor(expert_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
-            loss = criterion(output, targets)
-            model.zero_grad()
-            loss.backward()
-            with torch.no_grad():
-                for param in model.parameters():
-                    new_param = param - lr_finetune * param.grad
-                    param.copy_(new_param)
-        model.eval()
-
+      
         with torch.no_grad():
             # Main model processing
             logits = model(embedding,expert_cntx).squeeze(0)
@@ -89,9 +70,6 @@ def evaluate_merged(model, ema_model, emb_model, dataloader, criterion, beta=0.5
             top1_meter.update(top1.item())
             model_preds.extend(torch.argmax(scores, dim=1).cpu().tolist())
 
-            #Recover model
-            # model = model_backup
-            model.load_state_dict(initial_state, strict=True)
             # EMA model processing
             if ema_model is not None:
                 ema_logits = ema_model(embedding,expert_cntx).squeeze(0)
@@ -102,7 +80,6 @@ def evaluate_merged(model, ema_model, emb_model, dataloader, criterion, beta=0.5
 
             true_labels.extend(lbs.cpu().tolist())
 
-    model.load_state_dict(orig_state,strict=True)
 
     model.eval()
 
@@ -117,7 +94,6 @@ def evaluate_merged(model, ema_model, emb_model, dataloader, criterion, beta=0.5
 
     cm_model = confusion_matrix(true_labels, model_preds)
 
-    assert all(torch.equal(p1, p2) for p1, p2 in zip(model.state_dict().values(), initial_state.values())), "Model not restored correctly!"
 
     return (
         top1_meter.avg,
