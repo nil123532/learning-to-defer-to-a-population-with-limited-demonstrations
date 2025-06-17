@@ -8,9 +8,9 @@ bash train_cifar10.sh pop_attn  9 eval 0 500 w &&
 bash train_generated_experts_gtsrb.sh pop_attn 4 eval 0 473 lf && 
 bash train_generated_experts_gtsrb.sh pop_attn 21 eval 0 473 lf &&
 bash train_generated_experts_gtsrb.sh pop_attn 38 eval 0 473 lf &&
-bash train_gtsrb.sh pop_attn  1 eval 0 473 w &&
-bash train_gtsrb.sh pop_attn  5 eval 0 473 w &&
-bash train_gtsrb.sh pop_attn  9 eval 0 473 w &&
+bash train_gtsrb.sh pop_attn  4 train 0 473 w &&
+bash train_gtsrb.sh pop_attn  21 train 0 473 w &&
+bash train_gtsrb.sh pop_attn  38 train 0 473 w &&
 bash train_generated_experts_fashion.sh pop_attn 1 eval 0 500 lf && 
 bash train_generated_experts_fashion.sh pop_attn 5 eval 0 500 lf &&
 bash train_generated_experts_fashion.sh pop_attn 9 eval 0 500 lf &&
@@ -23,7 +23,6 @@ pop
 bash train_generated_experts_cifar.sh pop 1 eval 0 500 w && 
 bash train_generated_experts_cifar.sh pop 5 eval 0 500 w &&
 bash train_generated_experts_cifar.sh pop 9 eval 0 500 w &&
-<<<<<<< HEAD
 bash train_cifar10.sh pop  1 eval 0 500 w &&
 bash train_cifar10.sh pop  5 eval 0 500 w &&
 bash train_cifar10.sh pop  9 eval 0 500 w &&
@@ -32,17 +31,15 @@ bash train_generated_experts_gtsrb.sh pop 21 train 0 473 w &&
 bash train_generated_experts_gtsrb.sh pop 38 train 0 473 w &&
 bash train_gtsrb.sh pop  1 train 0 473 w &&
 bash train_gtsrb.sh pop  5 train 0 473 w &&
-=======
 bash train_cifar10.sh pop  1 train 0 500 w &&
 bash train_cifar10.sh pop  5 train 0 500 w &&
 bash train_cifar10.sh pop  9 train 0 500 w &&
 bash train_generated_experts_gtsrb.sh pop 4 eval 0 473 w && 
 bash train_generated_experts_gtsrb.sh pop 21 eval 0 473 w &&
 bash train_generated_experts_gtsrb.sh pop 38 eval 0 473 w &&
-bash train_gtsrb.sh pop  1 eval 0 473 w &&
-bash train_gtsrb.sh pop  5 eval 0 473 w &&
->>>>>>> 0f3ae60396875acd0c803fd56341faa3d789fc12
-bash train_gtsrb.sh pop  9 train 0 473 w &&
+bash train_gtsrb.sh pop  4 train 0 473 w &&
+bash train_gtsrb.sh pop  21 train 0 473 w &&
+bash train_gtsrb.sh pop  38 train 0 473 w &&
 bash train_generated_experts_fashion.sh pop 1 train 0 500 w && 
 bash train_generated_experts_fashion.sh pop 5 train 0 500 w &&
 bash train_generated_experts_fashion.sh pop 9 train 0 500 w &&
@@ -63,9 +60,9 @@ bash train_cifar10.sh single  9 train 0 500 w &&
 bash train_generated_experts_gtsrb.sh single 4 train 0 473 w && 
 bash train_generated_experts_gtsrb.sh single 21 train 0 473 w &&
 bash train_generated_experts_gtsrb.sh single 38 train 0 473 w &&
-bash train_gtsrb.sh single  1 train 0 473 w &&
-bash train_gtsrb.sh single  5 train 0 473 w &&
-bash train_gtsrb.sh single  9 train 0 473 w &&
+bash train_gtsrb.sh single  4 train 0 473 w &&
+bash train_gtsrb.sh single  21 train 0 473 w &&
+bash train_gtsrb.sh single  38 train 0 473 w &&
 hanwen
 bash train_generated_experts_fashion.sh single 1 train 0 500 w && 
 bash train_generated_experts_fashion.sh single 5 train 0 500 w &&
@@ -73,3 +70,13 @@ bash train_generated_experts_fashion.sh single 9 train 0 500 w &&
 bash fashion.sh single  1 train 0 500 w &&
 bash fashion.sh single  5 train 0 500 w &&
 bash fashion.sh single  9 train 0 500 w 
+
+
+
+
+bash train_gtsrb.sh pop_attn  4 train 0 473 w &&
+bash train_gtsrb.sh pop_attn  21 train 0 473 w &&
+bash train_gtsrb.sh pop_attn  38 train 0 473 w && 
+bash train_gtsrb.sh pop  4 train 0 473 w &&
+bash train_gtsrb.sh pop  21 train 0 473 w &&
+bash train_gtsrb.sh pop  38 train 0 473 w

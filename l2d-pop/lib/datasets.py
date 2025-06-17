@@ -249,7 +249,7 @@ def load_gtsrb(expert_type=None):
 
     elif expert_type == "limited_demo": 
         images_train, _, targets_train, _ , indices_train , _ = \
-            train_test_split(images_train,targets_train,indices_train,train_size=500,random_state=0,stratify=targets_train) 
+            train_test_split(images_train,targets_train,indices_train,train_size=473,random_state=0,stratify=targets_train) 
         print("Data for  limited demo")
         train_dataset = MyVisionDataset(images_train, targets_train, transform_train, indices_train)
         val_dataset = MyVisionDataset(images_val, targets_val, transform_test, indices_val)
