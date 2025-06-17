@@ -193,7 +193,7 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
     # ---------------------------
     best_steps, best_lr = 0, 0
     fmodel = model if ema_model is None else ema_model  
-    # best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
+    best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
 
     orig_state = copy.deepcopy(model.state_dict())
 
@@ -446,7 +446,7 @@ def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
     # ---------------------------
     best_steps, best_lr = 0, 0
     fmodel = model if ema_model is None else ema_model  
-    # best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
+    best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
 
 
     orig_state = copy.deepcopy(model.state_dict())
@@ -699,7 +699,7 @@ def predict_fashion_acc(model, ema_model, emb_model, trainloader_x, trainloader_
     # ---------------------------
     best_steps, best_lr = 0, 0
     fmodel = model if ema_model is None else ema_model  
-    # best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
+    best_steps, best_lr = find_best_lr_and_steps(fmodel,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
 
 
     orig_state = copy.deepcopy(model.state_dict())
