@@ -21,8 +21,13 @@ from lib.utils import accuracy, setup_default_logging, AverageMeter, WarmupCosin
 from lib.utils import load_from_checkpoint
 from lib.expert import  SyntheticExpertOverlap
 from lib.embedding_model import EmbeddingModel
+import itertools
 from itertools import product
 import pandas as pd
+import random
+import collections
+from math import gcd
+import math
 
 from lib.predict import predict_cifar_acc,predict_fashion_acc,predict_gtsrb_acc 
 from lib.evaluate import evaluate_merged
@@ -243,7 +248,8 @@ def train_one_epoch(
                 # Use the model with context
                 logits = model(embedding, expert_cntx)  
             elif args.with_attn == "single":
-                logits = model(embedding)  # Use the model without context
+                outputs = model(embedding)  # inference without context
+                logits = outputs.unsqueeze(0).repeat(n_experts,1,1)
 
             torch.cuda.synchronize()
             model_end = time.time()
@@ -381,6 +387,95 @@ def train_one_epoch(
     )
 
 
+def min_overlap(need: int, k: int, c: int) -> int:
+    """Smallest m such that capacity(m) ≥ need; raises if impossible."""
+    for m in range(k):                               # 0 … k-1
+        step      = k - m
+        capacity  = c // gcd(step, c)
+        if need <= capacity:
+            return m
+    raise ValueError(f"Even max_overlap=k-1 cannot provide {need} experts.")
+
+def _make_cyclic_experts_with_overlap(num_train, num_novel, k, c, max_overlap):
+    if not (0 <= max_overlap < k):
+        raise ValueError("max_overlap must satisfy 0 ≤ max_overlap < k.")
+
+    need   = num_train + num_novel
+    chosen = []
+    last   = None
+
+    for win in itertools.combinations(range(c), k):        # no list()
+        if last is None or len(set(win) & set(last)) <= max_overlap:
+            chosen.append(list(win))
+            last = win
+            if len(chosen) == need:         # early-exit: we’re done
+                break
+
+    if len(chosen) < need:
+        raise RuntimeError("Could not find enough windows with the given "
+                           "max_overlap.  Increase max_overlap or k.")
+
+    train_oracles = {f"Train_{i}": chosen[i] for i in range(num_train)}
+    novel_oracles = {f"Novel_{i}": chosen[num_train + i]
+                     for i in range(num_novel)}
+    return train_oracles, novel_oracles
+
+
+def make_cyclic_experts(num_train, num_novel, k, c):
+    """
+    Automatically finds the minimum max_overlap required to generate the
+    specified number of cyclic expert windows.
+
+    Args:
+        num_train (int): Number of training expert windows.
+        num_novel (int): Number of novel expert windows.
+        k (int): Size of each window (number of elements).
+        c (int): Total number of unique elements available (range(c)).
+
+    Returns:
+        tuple: (train_oracles, novel_oracles) dictionaries.
+
+    Raises:
+        ValueError: If input parameters are invalid.
+        RuntimeError: If it's impossible to find enough windows even with
+                      the maximum allowed overlap (k-1).
+    """
+    if not (num_train >= 0 and num_novel >= 0 and (num_train + num_novel) > 0):
+        raise ValueError("num_train and num_novel must be non-negative, and their sum must be positive.")
+    if not (k > 0):
+        raise ValueError("k must be a positive integer.")
+    if not (c >= k):
+        raise ValueError("c must be greater than or equal to k.")
+
+    low = 0
+    high = k - 1 # max_overlap must be strictly less than k
+    
+    best_overlap_found = -1
+    result_found = None
+
+    # Binary search for the smallest max_overlap that works
+    while low <= high:
+        mid = (low + high) // 2
+        try:
+            # Attempt to generate experts with the current mid max_overlap
+            current_result = _make_cyclic_experts_with_overlap(num_train, num_novel, k, c, mid)
+            
+            best_overlap_found = mid
+            result_found = current_result
+            high = mid - 1 # Search in the lower half (less overlap)
+            
+        except RuntimeError:
+            low = mid + 1 # Search in the upper half (more overlap)
+        except ValueError as e:
+            raise RuntimeError(f"Unexpected error during overlap search with max_overlap={mid}: {e}")
+
+    if result_found:
+        print(f"Successfully generated experts with auto-selected max_overlap = {best_overlap_found}")
+        return result_found
+    else:
+
+        raise RuntimeError("Could not find enough windows for any valid max_overlap. "
+                           "Consider increasing 'c' or 'k', or reducing 'num_train'/'num_novel'.")
 
 def main():
     parser = argparse.ArgumentParser(description='FixMatch Training')
@@ -461,163 +556,78 @@ def main():
     logger.info("***** Running training *****")
     logger.info(f"  Task = {args.dataset}@{args.n_labeled}")
     
+
    
    
 
-    if  'cifar10' in args.dataset.lower():
-        print("CIFAR10")
+    k = int(args.p_out)
+    n_train_experts = 10
+    n_known_test = 5  
+    n_novel_test = 5 
 
-        k = int(args.p_out)
-        n = 10
-        TOTAL = comb(n,k)
-        STEP = 17
-        experts_train = []
-        experts_test = [] 
-        experts_train_bin = []
-        experts_test_bin = []
-        config = {
-            "n_experts": 10,
-            "p_out" : int(args.p_out),
-            "n_classes": 10
-        }
-
-        for i in range(config["n_experts"]): # train
-            r = (i * STEP) % TOTAL
-            if args.p_out == 1:
-                class_oracle = i % config['n_classes']
-            else:
-                class_oracle = next(islice(combinations(range(n), k), r, None))
-            print("Classes oracle:",class_oracle)
-            expert_bin = SyntheticExpertOverlap(classes_oracle=class_oracle, n_classes=config["n_classes"], p_in=1.0, p_out=0)
-            experts_train_bin.append(expert_bin)
-            expert = SyntheticExpertOverlap(classes_oracle=class_oracle, n_classes=config["n_classes"], p_in=1.0, p_out=0,binary=False)
-            experts_train.append(expert) 
-        
-        
-        experts_test += experts_train[:config["n_experts"]//2] # pick 50% experts from experts_train (order not matter)
-        experts_test_bin += experts_train_bin[:config["n_experts"]//2] # pick 50% experts from experts_train (order not matter)
-
-        
-        for i in range(config["n_experts"]//2): # then sample 50% new experts
-            r = (i + 10 * STEP) % TOTAL
-            if config["p_out"] == 1:
-                class_oracle = (i + 15 % config["n_classes"])
-            else:
-                class_oracle = next(islice(combinations(range(n), k), r, None))
-            print("Classes oracle:",class_oracle)
-            expert_bin = SyntheticExpertOverlap(classes_oracle=class_oracle, n_classes=config["n_classes"], p_in=1.0, p_out=0)
-            experts_test_bin.append(expert_bin)
-            expert = SyntheticExpertOverlap(classes_oracle=class_oracle, n_classes=config["n_classes"], p_in=1.0, p_out=0,binary=False)
-            experts_test.append(expert)
-  
-
-        dltrain_x, dltrain_u , train_cntx_sampler , dl_x_eval , dl_u_eval = cifar.get_train_loader(
-            args.dataset, expert, args.batchsize, args.mu, n_iters_per_epoch, L=args.n_labeled, root=args.root,
-            method='fixmatch',weighted=False)
-        dlval , val_cntx_sampler = cifar.get_val_loader(args.dataset, expert, batch_size=64, num_workers=2)
-        
-        print("dltrain_x",len(dltrain_x.dataset))
-        print("dltrain_u",len(dltrain_u.dataset))
-        print("dlval",len(dlval.dataset))
-
-    elif 'fashion' in args.dataset.lower():
-
-        k = int(args.p_out)
-        n = 10
-        TOTAL = comb(n,k)
-        STEP = 17
-        experts_train = []
-        experts_test = [] 
-        experts_train_bin = []
-        experts_test_bin = []
-        config = {
-            "n_experts": 10,
-            "p_out" : int(args.p_out),
-            "n_classes": 10
-        }
-
-        for i in range(config["n_experts"]): # train
-            r = (i * STEP) % TOTAL
-            if args.p_out == 1:
-                class_oracle = i % config['n_classes']
-            else:
-                class_oracle = next(islice(combinations(range(n), k), r, None))
-            print("Classes oracle:",class_oracle)
-            expert_bin = SyntheticExpertOverlap(classes_oracle=class_oracle, n_classes=config["n_classes"], p_in=1.0, p_out=0)
-            experts_train_bin.append(expert_bin)
-            expert = SyntheticExpertOverlap(classes_oracle=class_oracle, n_classes=config["n_classes"], p_in=1.0, p_out=0,binary=False)
-            experts_train.append(expert) 
-        
-        
-        experts_test += experts_train[:config["n_experts"]//2] # pick 50% experts from experts_train (order not matter)
-        experts_test_bin += experts_train_bin[:config["n_experts"]//2] # pick 50% experts from experts_train (order not matter)
-
-        for i in range(config["n_experts"]//2): # then sample 50% new experts
-            r = (i + 10 * STEP) % TOTAL
-            if config["p_out"] == 1:
-                class_oracle = (i + 15 % config["n_classes"])
-            else:
-                class_oracle = next(islice(combinations(range(n), k), r, None))
-            print("Classes oracle:",class_oracle)
-            expert_bin = SyntheticExpertOverlap(classes_oracle=class_oracle, n_classes=config["n_classes"], p_in=1.0, p_out=0)
-            experts_test_bin.append(expert_bin)
-            expert = SyntheticExpertOverlap(classes_oracle=class_oracle, n_classes=config["n_classes"], p_in=1.0, p_out=0,binary=False)
-            experts_test.append(expert)
-
-        dltrain_x, dltrain_u , train_cntx_sampler , dl_x_eval , dl_u_eval = cifar.get_train_loader(
-            args.dataset, expert, args.batchsize, args.mu, n_iters_per_epoch, L=args.n_labeled, root=args.root,
-            method='fixmatch',weighted=False)
-        dlval , val_cntx_sampler = cifar.get_val_loader(args.dataset, expert, batch_size=64, num_workers=2)
-        
-
+    if 'cifar10' in args.dataset.lower() or 'fashion' in args.dataset.lower():
+        dataset_name = 'CIFAR10' if 'cifar10' in args.dataset.lower() else 'FashionMNIST'
+        print(dataset_name)
+        n_classes = 10
     elif 'gtsrb' in args.dataset.lower():
-      
-        k = int(args.p_out)
-        n = 43
-        TOTAL = comb(n,k)
-        STEP = 17
-        experts_train = []
-        experts_test = [] 
-        experts_train_bin = []
-        experts_test_bin = []
-        config = {
-            "n_experts": 10,
-            "p_out" : int(args.p_out),
-            "n_classes": 43
-        }
+        print("GTSRB")
+        n_classes = 43
 
-        for i in range(config["n_experts"]): # train
-            r = (i * STEP) % TOTAL
-            if args.p_out == 1:
-                class_oracle = i % config['n_classes']
-            else:
-                class_oracle = next(islice(combinations(range(n), k), r, None))
-            print("Classes oracle:",class_oracle)
-            expert_bin = SyntheticExpertOverlap(classes_oracle=class_oracle, n_classes=config["n_classes"], p_in=1.0, p_out=0)
-            experts_train_bin.append(expert_bin)
-            expert = SyntheticExpertOverlap(classes_oracle=class_oracle, n_classes=config["n_classes"], p_in=1.0, p_out=0,binary=False)
-            experts_train.append(expert) 
-        
-        
-        experts_test += experts_train[:config["n_experts"]//2] # pick 50% experts from experts_train (order not matter)
-        experts_test_bin += experts_train_bin[:config["n_experts"]//2] # pick 50% experts from experts_train (order not matter)
+    train_oracles , novel_oracles = make_cyclic_experts(num_train=n_train_experts,
+                                                        num_novel=n_novel_test,
+                                                        k=k,
+                                                        c=n_classes)
+    
 
-        for i in range(config["n_experts"]//2): # then sample 50% new experts
-            r = (i + 10 * STEP) % TOTAL
-            if config["p_out"] == 1:
-                class_oracle = (i + 15 % config["n_classes"])
-            else:
-                class_oracle = next(islice(combinations(range(n), k), r, None))
-            print("Classes oracle:",class_oracle)
-            expert_bin = SyntheticExpertOverlap(classes_oracle=class_oracle, n_classes=config["n_classes"], p_in=1.0, p_out=0)
-            experts_test_bin.append(expert_bin)
-            expert = SyntheticExpertOverlap(classes_oracle=class_oracle, n_classes=config["n_classes"], p_in=1.0, p_out=0,binary=False)
-            experts_test.append(expert)
+    # --- 3. Logging and Instantiation ---
 
-        dltrain_x, dltrain_u , train_cntx_sampler , dl_x_eval , dl_u_eval = cifar.get_train_loader(
-            args.dataset, expert, args.batchsize, args.mu, n_iters_per_epoch, L=args.n_labeled, root=args.root,
-            method='fixmatch',weighted=False)
-        dlval , val_cntx_sampler = cifar.get_val_loader(args.dataset, expert, batch_size=64, num_workers=2)
+    print("\n--- Generating Training Experts ---")
+    experts_train = []
+    for expert_id, oracle_list in train_oracles.items():
+        logger.info(f"  {expert_id}, Oracle Classes: {oracle_list}")
+        experts_train.append(
+            SyntheticExpertOverlap(classes_oracle=oracle_list, n_classes=n_classes, p_in=1.0, p_out=0, binary=False)
+        )
+
+    experts_train_bin = [
+        SyntheticExpertOverlap(classes_oracle=o, n_classes=n_classes, p_in=1.0, p_out=0, binary=True)
+        for o in train_oracles.values()
+    ]
+
+    print("\n--- Generating Novel Experts for Test Set ---")
+    novel_test_experts = []
+    for expert_id, oracle_list in novel_oracles.items():
+        logger.info(f"  {expert_id}, Oracle Classes: {oracle_list}")
+        novel_test_experts.append(
+            SyntheticExpertOverlap(classes_oracle=oracle_list, n_classes=n_classes, p_in=1.0, p_out=0, binary=False)
+        )
+
+    novel_test_experts_bin = [
+        SyntheticExpertOverlap(classes_oracle=o, n_classes=n_classes, p_in=1.0, p_out=0, binary=True)
+        for o in novel_oracles.values()
+    ]
+
+
+    # Construct the final test set with 50% known and 50% novel experts
+    experts_test = experts_train[:n_known_test] + novel_test_experts
+    experts_test_bin = experts_train_bin[:n_known_test] + novel_test_experts_bin
+  
+    print(f"\nSuccessfully generated {len(experts_train)} training experts.")
+    print(f"Successfully generated {len(experts_test)} test experts ({n_known_test} known, {n_novel_test} novel).")
+
+
+    # --- Dataloader creation remains the same ---
+    expert_for_loader = experts_train[0]
+
+    dltrain_x, dltrain_u , train_cntx_sampler , dl_x_eval , dl_u_eval = cifar.get_train_loader(
+        args.dataset, expert_for_loader, args.batchsize, args.mu, n_iters_per_epoch, L=args.n_labeled, root=args.root,
+        method='fixmatch',weighted=False)
+    dlval , val_cntx_sampler = cifar.get_val_loader(args.dataset, expert_for_loader, batch_size=64, num_workers=2)
+
+    print("dltrain_x",len(dltrain_x.dataset))
+    print("dltrain_u",len(dltrain_u.dataset))
+    print("dlval",len(dlval.dataset))
+
 
     model, criteria_x, criteria_u, ema_model = set_model(args)
     emb_model = EmbeddingModel(os.getcwd(), args.dataset)
@@ -712,7 +722,7 @@ def main():
         tb_logger.add_scalar('guess_label_acc', guess_label_acc, epoch)
         tb_logger.add_scalar('mask', mask_mean, epoch)
 
-        if epoch % 5 == 0:
+        if epoch % 10 == 0:
             records = []
             top1, ema_top1, f05_model, f05_ema, cm_model = evaluate_merged(model,ema_model,emb_model,dlval,criteria_x,beta=0.5,
                                                                             experts_test=experts_test,cntx=val_cntx_sampler,
@@ -759,6 +769,7 @@ def main():
                             format(epoch, top1, best_acc, best_epoch))
                 logger.info("Epoch {}. F0.5: {:.4f}".format(epoch, f05_model))
 
+    logger.info("Generate predictions for experts...")
     if 'cifar' in args.dataset.lower():
         for idx_exp, expert in enumerate(experts_train):
             print("Expert:",idx_exp+1)
@@ -771,6 +782,7 @@ def main():
             pred_file = f'expert_{idx_exp + 1}_{args.dataset.lower()}_expert{args.ex_strength}.{args.seed}@{args.n_labeled}_predictions.json'
             with open(f'artificial_expert_labels/{pred_file}', 'w') as f:
                 json.dump(predictions, f)
+
         # generate predictions for last 5 test experts
         for idx_exp, expert_test in enumerate(experts_test[-5:]):
 
@@ -797,7 +809,7 @@ def main():
                 logger.info(f"Validation accuracy: {accs['val']:.4f}")
                 with open(f'artificial_expert_labels/{pred_file}', 'w') as f:
                     json.dump(predictions, f)
-            # generate predictions for last 5 test experts
+        # generate predictions for last 5 test experts
         for idx_exp, expert_test in enumerate(experts_test[-5:]):
 
             predictions, accs = predict_gtsrb_acc(model,ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert_test,

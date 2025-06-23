@@ -720,6 +720,37 @@ def build_experts(dataset,n_classes,p_out,n_experts,expert_labels):
 
     return experts_train, experts_test
 
+def make_cyclic_experts(num_train, num_novel, k, c, max_overlap,logger=None):
+    """
+    Deterministically build experts by sliding a length-k window
+    around the class ring with step = k - max_overlap.
+    """
+    step = k - max_overlap           
+    if step <= 0:
+        raise ValueError("max_overlap too large; step must be ≥ 1.")
+
+    experts = []
+    for i in range(num_train + num_novel):
+        start = (i * step) % c
+        win   = [(start + j) % c for j in range(k)]
+        experts.append(win)
+
+    train_oracles = {f"Train_{i}": experts[i] for i in range(num_train)}
+    novel_oracles = {f"Novel_{i}": experts[num_train + i] for i in range(num_novel)}
+
+    #Print train and novel oracles
+    print("Train oracles:", train_oracles)
+    print("Novel oracles:", novel_oracles)
+    if logger is not None:
+        logger.info("Train oracles: {}".format(train_oracles))
+        logger.info("Novel oracles: {}".format(novel_oracles))
+
+    # Create experts for training and novel classes
+    experts_train = [SyntheticExpertOverlap(classes_oracle=oracle, n_classes=c, p_in=1.0, p_out=0.0) for oracle in train_oracles.values()]
+    experts_novel = [SyntheticExpertOverlap(classes_oracle=oracle, n_classes=c, p_in=1.0, p_out=0.0) for oracle in novel_oracles.values()]
+    return experts_train, experts_novel
+
+
 def main(config):
     set_seed(config["seed"])
     config["ckp_dir"] = f"./runs/{config['dataset']}/{config['loss_type']}/l2d_{config['l2d']}/{config['train_type']}/e_{str(config['expert_labels'])}_p{str(config['p_out'])}_seed{str(config['seed'])}"
@@ -757,7 +788,8 @@ def main(config):
     #GTSRB - sparse labels
     elif config["dataset"] == 'gtsrb':
         config["n_classes"] = 43
-        train_data, val_data, test_data = load_gtsrb(expert_type="limited_demo")    
+        # train_data, val_data, test_data = load_gtsrb(expert_type="limited_demo") 
+        train_data, val_data, test_data = load_gtsrb(expert_type="limited_demo")   
         # resnet_base = resnet20(norm_type=config["norm_type"])
         # n_features = resnet_base.n_features
         resnet_base = WideResNetBase(depth=28, n_channels=3, widen_factor=2, dropRate=0.0, norm_type=config["norm_type"])
@@ -859,13 +891,24 @@ def main(config):
     experts_train = []
     experts_test = []
 
-    experts_train, experts_test = build_experts(
-        dataset=config["dataset"],
-        n_classes=config["n_classes"],
-        p_out=int(config["p_out"]),
-        n_experts=config["n_experts"],
-        expert_labels=config.get("expert_labels", None)
-    )       
+    # experts_train, experts_test = build_experts(
+    #     dataset=config["dataset"],
+    #     n_classes=config["n_classes"],
+    #     p_out=int(config["p_out"]),
+    #     n_experts=config["n_experts"],
+    #     expert_labels=config.get("expert_labels", None)
+    # )       
+
+    #make logger for expert
+    logger = get_logger(os.path.join(config["ckp_dir"], "experts.log"))
+    experts_train, experts_test = make_cyclic_experts(
+        num_train=config["n_experts"], 
+        num_novel=5, 
+        k=int(config["p_out"]), 
+        c=config["n_classes"], 
+        max_overlap=1,
+        logger = logger
+    )
 
     # Context sampler train-time: just take from full train set (potentially with data augmentation)
     kwargs = {'num_workers': 0, 'pin_memory': True}

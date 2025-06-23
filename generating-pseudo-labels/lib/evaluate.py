@@ -64,7 +64,11 @@ def evaluate_merged(model, ema_model, emb_model, dataloader, criterion, beta=0.5
       
         with torch.no_grad():
             # Main model processing
-            logits = model(embedding,expert_cntx).squeeze(0)
+            try:
+                logits = model(embedding, expert_cntx).squeeze(0)
+            except Exception as e:
+                logits = model(embedding)
+            # logits = model(embedding,expert_cntx).squeeze(0)
             scores = torch.softmax(logits, dim=1)
             top1 = accuracy(scores, lbs, (1,))
             top1_meter.update(top1.item())

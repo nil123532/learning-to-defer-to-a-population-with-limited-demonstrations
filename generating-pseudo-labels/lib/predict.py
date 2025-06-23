@@ -12,15 +12,98 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from matplotlib import pyplot as plt
 import seaborn as sns
 
+
+
+# def find_best_lr_and_steps(model,emb_model,loader,expert,experts_bin,cntx_sampler):
+
+#     steps_grid = [1,2,5,10,20]
+#     lr_grid = [1e-1,1e-2,1e-3,1e-4,1e-5]
+#     records = []    
+    
+#     criterion = torch.nn.CrossEntropyLoss()
+#     orig_state = copy.deepcopy(model.state_dict())
+        
+
+#     for finetune_steps, lr_finetune in product(steps_grid, lr_grid):
+
+#         model.eval()
+
+#         top1_meter = AverageMeter()
+#         model_preds = []
+#         true_labels = []
+
+
+        
+#         for ims, lbs, im_id in loader:
+#             ims, lbs_orig = ims.cuda(), lbs.cuda()
+#             lbs = torch.tensor(experts_bin(labels=lbs_orig), dtype=torch.long).cuda()
+#             embedding = emb_model.get_embedding(batch=ims)
+#             expert_cntx = cntx_sampler.sample(n_experts = 1)
+#             cntx_yc_index = None if expert_cntx.yc_index is None else expert_cntx.yc_index.squeeze(0)
+#             exp_preds = torch.tensor(expert(expert_cntx.xc.squeeze(0), expert_cntx.yc.squeeze(), cntx_yc_index)).cuda()
+#             expert_cntx.mc = exp_preds.unsqueeze(0)
+#             E , NC = expert_cntx.xc.shape[:2]
+#             C , H , W = expert_cntx.xc.shape[-3:]
+#             xc_flat = expert_cntx.xc.flatten(0, 1)   # [E*Nc,3,32,32]
+#             xc_flat = xc_flat.cuda()
+#             em_flat = emb_model.get_embedding(xc_flat) # [E*Nc,1280]
+#             em    = em_flat.view(E, NC, -1) # [E,Nc,1280]
+#             expert_cntx.em = em
+
+#             model.train()
+#             for _ in range(finetune_steps):
+#                 output = model(em.squeeze(0),expert_cntx).squeeze(0)
+#                 targets = torch.tensor(experts_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
+#                 loss = criterion(output, targets)
+#                 model.zero_grad()
+#                 loss.backward()
+#                 with torch.no_grad():
+#                     for param in model.parameters():
+#                             # if param.requires_grad:
+#                             new_param = param - lr_finetune * param.grad
+#                             param.copy_(new_param)
+#             model.eval()
+
+#             with torch.no_grad():
+#                 logits = model(embedding, expert_cntx).squeeze(0)
+#                 scores = torch.softmax(logits, dim=1)
+#                 top1 = accuracy(scores,lbs, (1,))
+#                 top1_meter.update(top1.item())  
+#                 model_preds.extend(torch.argmax(scores, dim=1).cpu().tolist())
+
+#                 true_labels.extend(lbs.cpu().tolist())
+
+#             model.load_state_dict(orig_state, strict=True)
+
+#         model.eval()
+
+#         model_f05 = fbeta_score(true_labels,model_preds, beta=0.5)
+#         cm_model = confusion_matrix(true_labels,model_preds)
+
+#         acc = top1_meter.avg
+#         records.append({ 'steps': finetune_steps,
+#                         'lr': lr_finetune,
+#                         'acc': acc,
+#                         'f05': model_f05,
+#                         'cm_model': cm_model
+#                     })
+#     df = pd.DataFrame(records)
+#     best_idx = df['acc'].idxmax()
+#     best_row = df.loc[best_idx]
+
+#     return best_row['steps'], best_row['lr']
+
+
 def find_best_lr_and_steps(model,emb_model,loader,expert,experts_bin,cntx_sampler):
+
 
     steps_grid = [0,1,2,5,10,20]
     lr_grid = [1e-1,1e-2,1e-3]
+    # head_factor = 1
     records = []    
     
     criterion = torch.nn.CrossEntropyLoss()
     orig_state = copy.deepcopy(model.state_dict())
-
         
 
     for finetune_steps, lr_finetune in product(steps_grid, lr_grid):
@@ -49,17 +132,18 @@ def find_best_lr_and_steps(model,emb_model,loader,expert,experts_bin,cntx_sample
             em    = em_flat.view(E, NC, -1) # [E,Nc,1280]
             expert_cntx.em = em
 
+
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr_finetune)
             model.train()
             for _ in range(finetune_steps):
-                output = model(em.squeeze(0),expert_cntx).squeeze(0)
-                targets = torch.tensor(experts_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
+                optimizer.zero_grad()
+                output  = model(expert_cntx.em.squeeze(0), expert_cntx).squeeze(0)
+                targets = torch.tensor(
+                    experts_bin(None, expert_cntx.yc.squeeze(0), None)
+                ).cuda()
                 loss = criterion(output, targets)
-                model.zero_grad()
                 loss.backward()
-                with torch.no_grad():
-                    for param in model.parameters():
-                        new_param = param - lr_finetune * param.grad
-                        param.copy_(new_param)
+                optimizer.step()
             model.eval()
 
             with torch.no_grad():
@@ -156,9 +240,9 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
     best_steps, best_lr = 0, 0
     if args.finetune:
         best_steps, best_lr = find_best_lr_and_steps(model,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
+        print(f"Best steps: {best_steps}, Best lr: {best_lr}")
 
     orig_state = copy.deepcopy(model.state_dict())
-
     if trainloader_u is not None:
         final_labels_u = {}
         final_preds_u  = {}
@@ -180,6 +264,7 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
             expert_cntx.em = em
             model.train()
             
+            ### USING MANUAL UPDATE ###
             #finetuning
             for _ in range(best_steps):
                 output = model(em.squeeze(0),expert_cntx).squeeze(0)
@@ -191,6 +276,22 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
                     for param in model.parameters():
                         new_param = param - best_lr * param.grad
                         param.copy_(new_param)
+
+            ### USING OPTIMIZER ###
+            criterion = torch.nn.CrossEntropyLoss()
+            optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
+            model.train()
+            for _ in range(best_steps):
+                optimizer.zero_grad()
+                output  = model(expert_cntx.em.squeeze(0), expert_cntx).squeeze(0)
+                targets = torch.tensor(
+                    expert_bin(None, expert_cntx.yc.squeeze(0), None)
+                ).cuda()
+                loss = criterion(output, targets)
+                loss.backward()
+                optimizer.step()
+            model.eval()
+
 
 
             # Forward pass - Evaluation model
@@ -259,18 +360,34 @@ def predict_cifar_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
             em    = em_flat.view(E, NC, -1) # [E,Nc,1280]
             expert_cntx.em = em
 
+
+            ### USING MANUAL UPDATE ###
             #finetune stuff
+            # model.train()
+            # for _ in range(best_steps):
+            #     output = model(em.squeeze(0),expert_cntx).squeeze(0)
+            #     targets = torch.tensor(expert_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
+            #     loss = torch.nn.CrossEntropyLoss()(output, targets)
+            #     model.zero_grad()
+            #     loss.backward()
+            #     with torch.no_grad():
+            #         for param in model.parameters():
+            #             new_param = param - best_lr * param.grad
+            #             param.copy_(new_param)
+
+            ####### USING OPTIMIZER #######
+            optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
             model.train()
             for _ in range(best_steps):
-                output = model(em.squeeze(0),expert_cntx).squeeze(0)
-                targets = torch.tensor(expert_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
-                loss = torch.nn.CrossEntropyLoss()(output, targets)
-                model.zero_grad()
+                optimizer.zero_grad()
+                output  = model(expert_cntx.em.squeeze(0), expert_cntx).squeeze(0)
+                targets = torch.tensor(
+                    expert_bin(None, expert_cntx.yc.squeeze(0), None)
+                ).cuda()
+                loss = criterion(output, targets)
                 loss.backward()
-                with torch.no_grad():
-                    for param in model.parameters():
-                        new_param = param - best_lr * param.grad
-                        param.copy_(new_param)
+                optimizer.step()
+            model.eval()
             
 
             # Forward pass - Evaluation
@@ -410,6 +527,7 @@ def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
     best_steps, best_lr = 0, 0
     if args.finetune:
         best_steps, best_lr = find_best_lr_and_steps(model,emb_model,trainloader_u,expert,expert_bin,train_cntx_sampler)
+        print(f"Best steps: {best_steps}, Best lr: {best_lr}")
 
 
     orig_state = copy.deepcopy(model.state_dict())
@@ -434,21 +552,43 @@ def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
             em_flat = emb_model.get_embedding(xc_flat) # [E*Nc,1280]
             em    = em_flat.view(E, NC, -1) # [E,Nc,1280]
             expert_cntx.em = em
+
+
+            ### USING MANUAL UPDATE ###
+            # model.train()
+            # for _ in range(best_steps):
+            #     output = model(em.squeeze(0),expert_cntx).squeeze(0) if ema_model is None else ema_model(em.squeeze(0), expert_cntx).squeeze(0)
+            #     targets = torch.tensor(expert_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
+            #     loss = torch.nn.CrossEntropyLoss()(output, targets)
+            #     model.zero_grad()
+            #     loss.backward()
+            #     with torch.no_grad():
+            #         for param in model.parameters():
+            #             # if param.requires_grad:
+            #                 # Update only trainable parameters
+            #             new_param = param - best_lr * param.grad
+            #             param.copy_(new_param)
+        
+            # # Forward pass
+            # model.eval()
+
+            
+
+            ## USING OPTIMIZER ###
+            criterion = torch.nn.CrossEntropyLoss()
+            optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
             model.train()
-
             for _ in range(best_steps):
-                output = model(em.squeeze(0),expert_cntx).squeeze(0) if ema_model is None else ema_model(em.squeeze(0), expert_cntx).squeeze(0)
-                targets = torch.tensor(expert_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
-                loss = torch.nn.CrossEntropyLoss()(output, targets)
-                model.zero_grad()
+                optimizer.zero_grad()
+                output  = model(expert_cntx.em.squeeze(0), expert_cntx).squeeze(0)
+                targets = torch.tensor(
+                    expert_bin(None, expert_cntx.yc.squeeze(0), None)
+                ).cuda()
+                loss = criterion(output, targets)
                 loss.backward()
-                with torch.no_grad():
-                    for param in model.parameters():
-                        new_param = param - best_lr * param.grad
-                        param.copy_(new_param)
-
-            # Forward pass
+                optimizer.step()
             model.eval()
+
             with torch.no_grad():
                 embeddings = emb_model.get_embedding(ims_weak)
                 logits = model(embeddings, expert_cntx).squeeze(0) if ema_model is None else ema_model(embeddings, expert_cntx).squeeze(0)
@@ -468,7 +608,11 @@ def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
                 if preds_cpu[i] > 0:
                     pred = lbs_cpu[i]
                 else:
-                    pred = random.randint(0,42)
+                    while True:
+                        pred = random.randint(0,42)
+                        if pred != lbs_cpu[i]:
+                            break
+
       
                 final_preds_x[idx]  = pred
                 # Also put it into predictions['train']
@@ -491,6 +635,8 @@ def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
     # ---------------------------
     predictions = []
 
+
+        
     if testloader is not None:
         count = 0
         final_labels_val = {}
@@ -514,22 +660,37 @@ def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
             em    = em_flat.view(E, NC, -1) # [E,Nc,1280]
             expert_cntx.em = em
 
+            ### USING MANUAL UPDATE ###
+            # model.train()
+            # for _ in range(best_steps):
+            #     output = model(em.squeeze(0),expert_cntx).squeeze(0) if ema_model is None else ema_model(em.squeeze(0), expert_cntx).squeeze(0)
+            #     targets = torch.tensor(expert_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
+            #     loss = torch.nn.CrossEntropyLoss()(output, targets)
+            #     model.zero_grad()
+            #     loss.backward()
+        
+            #     with torch.no_grad():
+            #         for param in model.parameters():
+            #             # if param.requires_grad:
+            #             new_param = param - best_lr * param.grad
+            #             param.copy_(new_param)
+            # # Forward pass
+            # model.eval()
 
+            ####### USING OPTIMIZER #######
+            optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
             model.train()
             for _ in range(best_steps):
-                output = model(em.squeeze(0),expert_cntx).squeeze(0) if ema_model is None else ema_model(em.squeeze(0), expert_cntx).squeeze(0)
-                targets = torch.tensor(expert_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
-                loss = torch.nn.CrossEntropyLoss()(output, targets)
-                model.zero_grad()
+                optimizer.zero_grad()
+                output  = model(expert_cntx.em.squeeze(0), expert_cntx).squeeze(0)
+                targets = torch.tensor(
+                    expert_bin(None, expert_cntx.yc.squeeze(0), None)
+                ).cuda()
+                loss = criterion(output, targets)
                 loss.backward()
-                with torch.no_grad():
-                    for param in model.parameters():
-                        new_param = param - best_lr * param.grad
-                        param.copy_(new_param)
-            
-
-            # Forward pass
+                optimizer.step()
             model.eval()
+
             with torch.no_grad():
                 embeddings = emb_model.get_embedding(ims)
                 logits = model(embeddings, expert_cntx).squeeze(0) if ema_model is None else ema_model(embeddings, expert_cntx).squeeze(0)
@@ -551,7 +712,10 @@ def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
                 if preds_cpu[i] > 0:
                     pred = lbs_cpu[i]
                 else:
-                    pred = random.randint(0,42)
+                    while True:
+                        pred = random.randint(0,42)
+                        if pred != lbs_cpu[i]:
+                            break
 
                 count += 1 if lbl_true_expert_labels[i] == lbs_cpu[i] else 0
                 predictions_dict['test'][idx] = pred
@@ -690,16 +854,31 @@ def predict_fashion_acc(model, ema_model, emb_model, trainloader_x, trainloader_
             expert_cntx.em = em
             model.train()
 
+            ### USING MANUAL UPDATE ###
+            # for _ in range(best_steps):
+            #     output = model(em.squeeze(0),expert_cntx).squeeze(0) if ema_model is None else ema_model(em.squeeze(0), expert_cntx).squeeze(0)
+            #     targets = torch.tensor(expert_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
+            #     loss = torch.nn.CrossEntropyLoss()(output, targets)
+            #     model.zero_grad()
+            #     loss.backward()
+            #     with torch.no_grad():
+            #         for param in model.parameters():
+            #             new_param = param - best_lr * param.grad
+            #             param.copy_(new_param)
+
+            ### USING OPTIMIZER ###
+            optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
+            criterion = torch.nn.CrossEntropyLoss() 
+            model.train()
             for _ in range(best_steps):
-                output = model(em.squeeze(0),expert_cntx).squeeze(0) if ema_model is None else ema_model(em.squeeze(0), expert_cntx).squeeze(0)
-                targets = torch.tensor(expert_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
-                loss = torch.nn.CrossEntropyLoss()(output, targets)
-                model.zero_grad()
+                optimizer.zero_grad()
+                output  = model(expert_cntx.em.squeeze(0), expert_cntx).squeeze(0)
+                targets = torch.tensor(
+                    expert_bin(None, expert_cntx.yc.squeeze(0), None)
+                ).cuda()
+                loss = criterion(output, targets)
                 loss.backward()
-                with torch.no_grad():
-                    for param in model.parameters():
-                        new_param = param - best_lr * param.grad
-                        param.copy_(new_param)
+                optimizer.step()
 
             # Forward pass
             model.eval()
@@ -760,19 +939,33 @@ def predict_fashion_acc(model, ema_model, emb_model, trainloader_x, trainloader_
             em    = em_flat.view(E, NC, -1) # [E,Nc,1280]
             expert_cntx.em = em
 
-
+            ### USING MANUAL UPDATE ###
+            # model.train()
+            # for _ in range(best_steps):
+            #     output = model(em.squeeze(0),expert_cntx).squeeze(0) if ema_model is None else ema_model(em.squeeze(0), expert_cntx).squeeze(0)
+            #     targets = torch.tensor(expert_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
+            #     loss = torch.nn.CrossEntropyLoss()(output, targets)
+            #     model.zero_grad()
+            #     loss.backward()
+            #     with torch.no_grad():
+            #         for param in model.parameters():
+            #             new_param = param - best_lr * param.grad
+            #             param.copy_(new_param)
+            
+            ####### USING OPTIMIZER #######
+            optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
+            criterion = torch.nn.CrossEntropyLoss() 
             model.train()
             for _ in range(best_steps):
-                output = model(em.squeeze(0),expert_cntx).squeeze(0) if ema_model is None else ema_model(em.squeeze(0), expert_cntx).squeeze(0)
-                targets = torch.tensor(expert_bin(None, expert_cntx.yc.squeeze(0), None)).cuda()
-                loss = torch.nn.CrossEntropyLoss()(output, targets)
-                model.zero_grad()
+                optimizer.zero_grad()
+                output  = model(expert_cntx.em.squeeze(0), expert_cntx).squeeze(0)
+                targets = torch.tensor(
+                    expert_bin(None, expert_cntx.yc.squeeze(0), None)
+                ).cuda()
+                loss = criterion(output, targets)
                 loss.backward()
-                with torch.no_grad():
-                    for param in model.parameters():
-                        new_param = param - best_lr * param.grad
-                        param.copy_(new_param)
-            
+                optimizer.step()
+            model.eval()
 
             # Forward pass
             model.eval()
