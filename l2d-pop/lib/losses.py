@@ -5,23 +5,41 @@ import functorch
 import torch.nn.functional as F
 
 
-def cross_entropy(outputs, m, labels, n_classes,reduction='mean'):
-    '''
-    The L_{CE} loss implementation for CIFAR with alpha=1
-    ----
-    outputs: network outputs
-    m: cost of deferring to expert cost of classifier predicting (I_{m =y})
-    labels: target
-    n_classes: number of classes
-    '''
-    batch_size = outputs.size()[0]
-    rc = [n_classes] * batch_size # idx to extract rejector function
-    outputs = -m * torch.log2(outputs[range(batch_size), rc]) - torch.log2(outputs[range(batch_size), labels])
+# def cross_entropy(outputs, m, labels, n_classes,reduction='mean'):
+#     '''
+#     The L_{CE} loss implementation for CIFAR with alpha=1
+#     ----
+#     outputs: network outputs
+#     m: cost of deferring to expert cost of classifier predicting (I_{m =y})
+#     labels: target
+#     n_classes: number of classes
+#     '''
+#     batch_size = outputs.size()[0]
+#     rc = [n_classes] * batch_size # idx to extract rejector function
+#     outputs = -m * torch.log2(outputs[range(batch_size), rc]) - torch.log2(outputs[range(batch_size), labels])
     
-    if reduction == 'mean':
-        return torch.sum(outputs) / batch_size
-    elif reduction == 'none':
-        return outputs
+#     if reduction == 'mean':
+#         return torch.sum(outputs) / batch_size
+#     elif reduction == 'none':
+#         return outputs
+
+def cross_entropy(outputs, m, labels, n_classes, reduction='mean', eps=1e-12):
+    """
+    outputs : soft-max probabilities (NOT logits)
+    m       : 0/1 vector, cost of deferring
+    labels  : ground-truth class indices
+    """
+    batch_size = outputs.size(0)
+    rc = [n_classes] * batch_size                      # rejector column
+
+    # prevent log(0) → -inf
+    p_rej = outputs[range(batch_size), rc   ].clamp_min(eps)
+    p_cls = outputs[range(batch_size), labels].clamp_min(eps)
+
+    loss = -m * torch.log2(p_rej) - torch.log2(p_cls)
+
+    return loss.mean() if reduction == 'mean' else loss
+
 
 def ova(outputs, m, labels, n_classes):
     batch_size = outputs.size()[0]

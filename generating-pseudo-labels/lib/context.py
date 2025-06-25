@@ -118,6 +118,8 @@ class ContextSampler():
         else:
             input_all, target_all = data_batch
             input_all, target_all = input_all.to(self.device), target_all.to(self.device)
+            #print distribution of target_all
+            
             return input_all, target_all
         
        

@@ -7,6 +7,7 @@ seed=$4
 flags=''
 expert_labels=$5
 train_type=$6
+expert_type=$7
 # if [ ! -z "$5" ]; then
 #     flags="${flags} --n_steps_maml=${5}"
 # fi
@@ -25,7 +26,7 @@ dataset=generated_expert_labels_gtsrb
 val_batch_size=8
 test_batch_size=1
 warmstart=true
-n_cntx_pts=50
+n_cntx_pts=43
 depth_embed=5
 depth_reject=3
 norm_type=batchnorm
@@ -43,7 +44,8 @@ command="python main.py --l2d=${l2d} --p_out=${p_out} --mode=${mode} --seed=${se
                         --train_batch_size=${train_batch_size} --lr_wrn=${lr_wrn} --lr_other=${lr_other} --weight_decay=${weight_decay}\
                         --dataset=${dataset} --val_batch_size=${val_batch_size} --test_batch_size=${test_batch_size}\
                         --epochs=${epochs} --n_cntx_pts=${n_cntx_pts} --depth_embed=${depth_embed}\
-                        --depth_reject=${depth_reject} --norm_type=${norm_type} --loss_type=${loss_type} ${flags} --expert_labels=${expert_labels} --train_type=${train_type}"
+                        --depth_reject=${depth_reject} --norm_type=${norm_type} --loss_type=${loss_type} ${flags} --expert_labels=${expert_labels} \
+                         --train_type=${train_type} --expert_type=${expert_type}"
 echo ${command}
 
 eval $command

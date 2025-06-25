@@ -421,61 +421,61 @@ def _make_cyclic_experts_with_overlap(num_train, num_novel, k, c, max_overlap):
     return train_oracles, novel_oracles
 
 
-def make_cyclic_experts(num_train, num_novel, k, c):
-    """
-    Automatically finds the minimum max_overlap required to generate the
-    specified number of cyclic expert windows.
+# def make_cyclic_experts(num_train, num_novel, k, c):
+#     """
+#     Automatically finds the minimum max_overlap required to generate the
+#     specified number of cyclic expert windows.
 
-    Args:
-        num_train (int): Number of training expert windows.
-        num_novel (int): Number of novel expert windows.
-        k (int): Size of each window (number of elements).
-        c (int): Total number of unique elements available (range(c)).
+#     Args:
+#         num_train (int): Number of training expert windows.
+#         num_novel (int): Number of novel expert windows.
+#         k (int): Size of each window (number of elements).
+#         c (int): Total number of unique elements available (range(c)).
 
-    Returns:
-        tuple: (train_oracles, novel_oracles) dictionaries.
+#     Returns:
+#         tuple: (train_oracles, novel_oracles) dictionaries.
 
-    Raises:
-        ValueError: If input parameters are invalid.
-        RuntimeError: If it's impossible to find enough windows even with
-                      the maximum allowed overlap (k-1).
-    """
-    if not (num_train >= 0 and num_novel >= 0 and (num_train + num_novel) > 0):
-        raise ValueError("num_train and num_novel must be non-negative, and their sum must be positive.")
-    if not (k > 0):
-        raise ValueError("k must be a positive integer.")
-    if not (c >= k):
-        raise ValueError("c must be greater than or equal to k.")
+#     Raises:
+#         ValueError: If input parameters are invalid.
+#         RuntimeError: If it's impossible to find enough windows even with
+#                       the maximum allowed overlap (k-1).
+#     """
+#     if not (num_train >= 0 and num_novel >= 0 and (num_train + num_novel) > 0):
+#         raise ValueError("num_train and num_novel must be non-negative, and their sum must be positive.")
+#     if not (k > 0):
+#         raise ValueError("k must be a positive integer.")
+#     if not (c >= k):
+#         raise ValueError("c must be greater than or equal to k.")
 
-    low = 0
-    high = k - 1 # max_overlap must be strictly less than k
+#     low = 0
+#     high = k - 1 # max_overlap must be strictly less than k
     
-    best_overlap_found = -1
-    result_found = None
+#     best_overlap_found = -1
+#     result_found = None
 
-    # Binary search for the smallest max_overlap that works
-    while low <= high:
-        mid = (low + high) // 2
-        try:
-            # Attempt to generate experts with the current mid max_overlap
-            current_result = _make_cyclic_experts_with_overlap(num_train, num_novel, k, c, mid)
+#     # Binary search for the smallest max_overlap that works
+#     while low <= high:
+#         mid = (low + high) // 2
+#         try:
+#             # Attempt to generate experts with the current mid max_overlap
+#             current_result = _make_cyclic_experts_with_overlap(num_train, num_novel, k, c, mid)
             
-            best_overlap_found = mid
-            result_found = current_result
-            high = mid - 1 # Search in the lower half (less overlap)
+#             best_overlap_found = mid
+#             result_found = current_result
+#             high = mid - 1 # Search in the lower half (less overlap)
             
-        except RuntimeError:
-            low = mid + 1 # Search in the upper half (more overlap)
-        except ValueError as e:
-            raise RuntimeError(f"Unexpected error during overlap search with max_overlap={mid}: {e}")
+#         except RuntimeError:
+#             low = mid + 1 # Search in the upper half (more overlap)
+#         except ValueError as e:
+#             raise RuntimeError(f"Unexpected error during overlap search with max_overlap={mid}: {e}")
 
-    if result_found:
-        print(f"Successfully generated experts with auto-selected max_overlap = {best_overlap_found}")
-        return result_found
-    else:
+#     if result_found:
+#         print(f"Successfully generated experts with auto-selected max_overlap = {best_overlap_found}")
+#         return result_found
+#     else:
 
-        raise RuntimeError("Could not find enough windows for any valid max_overlap. "
-                           "Consider increasing 'c' or 'k', or reducing 'num_train'/'num_novel'.")
+#         raise RuntimeError("Could not find enough windows for any valid max_overlap. "
+#                            "Consider increasing 'c' or 'k', or reducing 'num_train'/'num_novel'.")
 
 def main():
     parser = argparse.ArgumentParser(description='FixMatch Training')
@@ -569,14 +569,17 @@ def main():
         dataset_name = 'CIFAR10' if 'cifar10' in args.dataset.lower() else 'FashionMNIST'
         print(dataset_name)
         n_classes = 10
+        max_overlap = k - 1
     elif 'gtsrb' in args.dataset.lower():
         print("GTSRB")
         n_classes = 43
+        max_overlap = k - 7
 
-    train_oracles , novel_oracles = make_cyclic_experts(num_train=n_train_experts,
+    train_oracles , novel_oracles = _make_cyclic_experts_with_overlap(num_train=n_train_experts,
                                                         num_novel=n_novel_test,
                                                         k=k,
-                                                        c=n_classes)
+                                                        c=n_classes,
+                                                        max_overlap=max_overlap)
     
 
     # --- 3. Logging and Instantiation ---

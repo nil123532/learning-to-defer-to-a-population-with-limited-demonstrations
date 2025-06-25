@@ -94,11 +94,23 @@ import seaborn as sns
 #     return best_row['steps'], best_row['lr']
 
 
+def freeze_except_fc(model):
+    """
+    Freeze all layers except the final fully connected layer.
+    """
+    for name, param in model.named_parameters():
+        if 'fc' not in name:
+            param.requires_grad = False
+        else:
+            param.requires_grad = True
+    return model
+
 def find_best_lr_and_steps(model,emb_model,loader,expert,experts_bin,cntx_sampler):
 
 
     steps_grid = [0,1,2,5,10,20]
     lr_grid = [1e-1,1e-2,1e-3]
+    losses = []
     # head_factor = 1
     records = []    
     
@@ -132,8 +144,22 @@ def find_best_lr_and_steps(model,emb_model,loader,expert,experts_bin,cntx_sample
             em    = em_flat.view(E, NC, -1) # [E,Nc,1280]
             expert_cntx.em = em
 
+            ### Whole model finetuning
+            # optimizer = torch.optim.Adam(model.parameters(), lr=lr_finetune)
+            # model.train()
+            # for _ in range(finetune_steps):
+            #     optimizer.zero_grad()
+            #     output  = model(expert_cntx.em.squeeze(0), expert_cntx).squeeze(0)
+            #     targets = torch.tensor(
+            #         experts_bin(None, expert_cntx.yc.squeeze(0), None)
+            #     ).cuda()
+            #     loss = criterion(output, targets)
+            #     loss.backward()
+            #     optimizer.step()
+            # model.eval()
 
-            optimizer = torch.optim.Adam(model.parameters(), lr=lr_finetune)
+            ### head finetuning
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr_finetune)    
             model.train()
             for _ in range(finetune_steps):
                 optimizer.zero_grad()
@@ -142,9 +168,11 @@ def find_best_lr_and_steps(model,emb_model,loader,expert,experts_bin,cntx_sample
                     experts_bin(None, expert_cntx.yc.squeeze(0), None)
                 ).cuda()
                 loss = criterion(output, targets)
+                losses.append(loss.item())
                 loss.backward()
                 optimizer.step()
             model.eval()
+
 
             with torch.no_grad():
                 logits = model(embedding, expert_cntx).squeeze(0)
@@ -161,6 +189,8 @@ def find_best_lr_and_steps(model,emb_model,loader,expert,experts_bin,cntx_sample
 
         model_f05 = fbeta_score(true_labels,model_preds, beta=0.5)
         cm_model = confusion_matrix(true_labels,model_preds)
+
+        # print(f"Finetune Steps:{finetune_steps}, LR: {lr_finetune}, loss : {np.mean(losses)}")
 
         acc = top1_meter.avg
         records.append({ 'steps': finetune_steps,
@@ -576,7 +606,22 @@ def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
 
             ## USING OPTIMIZER ###
             criterion = torch.nn.CrossEntropyLoss()
-            optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
+            ## Whole model finetuning
+            # optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
+            # model.train()
+            # for _ in range(best_steps):
+            #     optimizer.zero_grad()
+            #     output  = model(expert_cntx.em.squeeze(0), expert_cntx).squeeze(0)
+            #     targets = torch.tensor(
+            #         expert_bin(None, expert_cntx.yc.squeeze(0), None)
+            #     ).cuda()
+            #     loss = criterion(output, targets)
+            #     loss.backward()
+            #     optimizer.step()
+            # model.eval()
+
+             ### head finetuning
+            optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)    
             model.train()
             for _ in range(best_steps):
                 optimizer.zero_grad()
@@ -678,7 +723,20 @@ def predict_gtsrb_acc(model, ema_model, emb_model, trainloader_x, trainloader_u,
             # model.eval()
 
             ####### USING OPTIMIZER #######
-            optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
+            # optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)
+            # model.train()
+            # for _ in range(best_steps):
+            #     optimizer.zero_grad()
+            #     output  = model(expert_cntx.em.squeeze(0), expert_cntx).squeeze(0)
+            #     targets = torch.tensor(
+            #         expert_bin(None, expert_cntx.yc.squeeze(0), None)
+            #     ).cuda()
+            #     loss = criterion(output, targets)
+            #     loss.backward()
+            #     optimizer.step()
+            # model.eval()
+
+            optimizer = torch.optim.Adam(model.parameters(), lr=best_lr)    
             model.train()
             for _ in range(best_steps):
                 optimizer.zero_grad()
