@@ -756,7 +756,7 @@ def get_train_loader(dataset, expert, batch_size, mu, n_iters_per_epoch, L, root
             transforms.ToTensor(),
             normalize,
         ])
-        cntx_sampler = ContextSampler(data_x,label_x,transform_train,n_cntx_pts=50,device='cuda')
+        cntx_sampler = ContextSampler(data_x,label_x,transform_train,n_cntx_pts=430,device='cuda')
         ds_x = GTSRBDataset(
             data=data_x,
             labels=label_x,
@@ -1040,7 +1040,7 @@ def get_val_loader(dataset, expert, batch_size, num_workers, pin_memory=True, ro
         print("Length of context set:", len(data_x))
         print("Length of test set:", len(data_test))    
         
-        cntx_sampler = ContextSampler(data_x,labels_x,transform_test,original_indices=indices_x,n_cntx_pts=50,device='cuda')
+        cntx_sampler = ContextSampler(data_x,labels_x,transform_test,original_indices=indices_x,n_cntx_pts=430,device='cuda')
         ds = GTSRBDataset(
             data=data_test,
             labels=labels_test,

@@ -85,7 +85,7 @@ class MyVisionDataset(VisionDataset):
 
 
 class ContextSampler():
-    def __init__(self, images, labels, transform, original_indices=None, n_cntx_pts=50, device='cpu', **kwargs):
+    def __init__(self, images, labels, transform, original_indices=None, n_cntx_pts=50, device='cpu',use_balanced_sampler=True, **kwargs):
         self.n_cntx_pts = n_cntx_pts
         self.device = device
         self.with_additional_label = False
@@ -94,7 +94,14 @@ class ContextSampler():
 
 
         dataset = MyVisionDataset(images, labels, transform,original_indices=original_indices)
-        self.dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.n_cntx_pts, shuffle=True, drop_last=True, **kwargs)
+
+        if use_balanced_sampler:
+            batch_sampler = BalancedBatchSampler(labels, batch_size=self.n_cntx_pts)
+            self.dataloader = torch.utils.data.DataLoader(dataset, batch_sampler=batch_sampler, **kwargs)
+
+        else:    
+            self.dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.n_cntx_pts, shuffle=True, drop_last=True, **kwargs)
+        
         self.data_iter = iter(self.dataloader)
 
     def _balanced_sample(self):
@@ -111,7 +118,11 @@ class ContextSampler():
         else:
             input_all, target_all = data_batch
             input_all, target_all = input_all.to(self.device), target_all.to(self.device)
+            #print distribution of target_all
+            
             return input_all, target_all
+        
+       
 
 
     def sample(self, n_experts=1):

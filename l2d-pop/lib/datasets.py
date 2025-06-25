@@ -9,7 +9,9 @@ from torchvision.datasets.cifar import VisionDataset
 import pandas as pd 
 from PIL import Image
 import os
-from lib.utils import ROOT
+from lib.utils import ROOT,BalancedBatchSampler
+
+
 
 #NR - To split based on patient id 
 def extract_patient_id(file_path):
@@ -53,7 +55,7 @@ class MyVisionDataset(VisionDataset):
 
 
 class ContextSampler():
-    def __init__(self, images, labels, transform, n_cntx_pts=50, device='cpu', original_indices=None, **kwargs):
+    def __init__(self, images, labels, transform, n_cntx_pts=50, device='cpu', original_indices=None, balanced=True, **kwargs):
         self.n_cntx_pts = n_cntx_pts
         self.device = device
         self.with_additional_label = False
@@ -61,7 +63,12 @@ class ContextSampler():
             self.with_additional_label = True
 
         dataset = MyVisionDataset(images, labels, transform,original_indices)
-        self.dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.n_cntx_pts, shuffle=True, drop_last=True, **kwargs)
+
+        if balanced:
+            batch_sampler = BalancedBatchSampler(labels, batch_size=self.n_cntx_pts)
+            self.dataloader = torch.utils.data.DataLoader(dataset, batch_sampler=batch_sampler, **kwargs)
+        else:
+            self.dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.n_cntx_pts, shuffle=True, drop_last=True, **kwargs)
         self.data_iter = iter(self.dataloader)
 
     def _balanced_sample(self):

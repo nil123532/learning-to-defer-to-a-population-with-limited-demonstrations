@@ -97,15 +97,47 @@ def get_activation(act_str):
     else:
         raise ValueError('invalid activation')
 
+class FiLM(nn.Module):
+    """
+    Feature-wise Linear Modulation: y = γ(h) ⊙ x + β(h)
+    x: [..., D]          (features to modulate)
+    h: [..., H]          (conditioning vector)
+    """
+    def __init__(self, x_dim: int, cond_dim: int):
+        super().__init__()
+        self.to_gamma = nn.Linear(cond_dim, x_dim)
+        self.to_beta  = nn.Linear(cond_dim, x_dim)
+        nn.init.zeros_(self.to_gamma.weight)
+        nn.init.ones_(self.to_gamma.bias)
+        nn.init.zeros_(self.to_beta.weight)
+        nn.init.zeros_(self.to_beta.bias)
+
+    def forward(self, x, h):
+        """
+        x : [B,Dx]          or [E,B,Dx]
+        h : [B,H]           conditioning vector (one per sample)
+        """
+        gamma = self.to_gamma(h)       # [B, Dx]
+        beta  = self.to_beta(h)        # [B, Dx]
+
+        # If x has an extra expert dimension, prepend a singleton so
+        # broadcasting works automatically.
+        while gamma.ndim < x.ndim:     # will loop 0 or 1 times
+            gamma = gamma.unsqueeze(0) # → [1,B,Dx]  (if needed)
+            beta  = beta.unsqueeze(0)
+
+        return gamma * x + beta
+
 
 class ClassifierRejectorWithContextEmbedder(nn.Module):
-    def __init__(self, num_classes = 2, n_features=None, dim_hid=128, depth_embed=6, dim_class_embed=128,with_softmax=True,actual_classes=10,with_attn=False):
+    def __init__(self, num_classes = 2, n_features=None, dim_hid=128, depth_embed=6, dim_class_embed=128,with_softmax=True,actual_classes=10,with_attn=False,use_film=False):
         super(ClassifierRejectorWithContextEmbedder, self).__init__()
         self.num_classes = num_classes
         self.with_attn = with_attn
         self.with_softmax = with_softmax
         self.dim_hid = dim_hid
         self.n_features = n_features #same as the output features of the embedding model
+        self.use_film = use_film
         
         self.fc = nn.Linear(n_features+dim_hid, num_classes)
         self.fc.bias.data.zero_()
@@ -113,7 +145,7 @@ class ClassifierRejectorWithContextEmbedder(nn.Module):
         self.embed_class_m = nn.Embedding(actual_classes, dim_class_embed) # created a class embedding layer
         self.embed_class = nn.Embedding(actual_classes, dim_class_embed) # created a class embedding layer
 
-
+        self.film = FiLM(n_features, dim_hid) if use_film else None
         if self.with_attn == 'mlp':
             self.embed = build_mlp(n_features+dim_class_embed*2, dim_hid, dim_hid, depth_embed)
         elif self.with_attn == 'attn':
@@ -150,8 +182,12 @@ class ClassifierRejectorWithContextEmbedder(nn.Module):
         else:
             embedding = self.encode(cntxt, x_embed) # [E,B,H]
 
+    
         
         x_embed = x_embed.unsqueeze(0).repeat(n_experts,1,1) # [E,B,Dx]
+
+        if self.use_film:
+            x_embed = self.film(x_embed, embedding)              # [E,B,Dx]
 
         packed = torch.cat([x_embed,embedding], -1) # [E,B,Dx+H]
         
@@ -191,23 +227,15 @@ class ClassifierRejector(nn.Module):
         super(ClassifierRejector, self).__init__()
   
 
-        self.fc_clf = nn.Linear(n_features, num_classes)
-        self.fc_clf.bias.data.zero_()
+        self.fc = nn.Linear(n_features, num_classes)
+        self.fc.bias.data.zero_()
 
-        self.fc_rej = nn.Linear(n_features, 1)
-        self.fc_rej.bias.data.zero_()
 
         self.with_softmax = with_softmax
     
 
     def forward(self, x):
-        out = self.base_model_clf(x)
-        logits_clf = self.fc_clf(out) # [B,K]
-
-        out = self.base_model_rej(x)
-        logit_rej = self.fc_rej(out) # [B,1]
-
-        out = torch.cat([logits_clf,logit_rej], -1) # [B,K+1]
+        out = self.fc(x) # [B,K]
 
         if self.with_softmax:
             out = F.softmax(out, dim=-1)

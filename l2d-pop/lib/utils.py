@@ -229,3 +229,38 @@ def get_prox_penalty(model_t, model_target):
     return result
 
 
+# --- NEW: exact-balance batch sampler ---------------------------------
+class BalancedBatchSampler(torch.utils.data.Sampler):
+    """
+    Yields a list of indices such that every batch contains 
+    the same number of examples from each class.
+    """
+    def __init__(self, labels, batch_size: int):
+        self.labels   = np.asarray(labels)
+        self.classes  = np.unique(self.labels)
+        self.n_cls    = len(self.classes)
+
+        if batch_size % self.n_cls:
+            raise ValueError(
+                f"batch_size ({batch_size}) must be a multiple "
+                f"of #classes ({self.n_cls}) to get perfect balance."
+            )
+
+        self.k = batch_size // self.n_cls        # samples / class / batch
+        self.lookup = {c: np.where(self.labels == c)[0] for c in self.classes}
+
+    def __iter__(self):
+        while True:                              # endless generator
+            batch_idx = []
+            for c in self.classes:
+                idx = np.random.choice(
+                    self.lookup[c],
+                    self.k,
+                    replace=len(self.lookup[c]) < self.k   # oversample if needed
+                )
+                batch_idx.extend(idx)
+            np.random.shuffle(batch_idx)         # keep batches i.i.d.
+            yield batch_idx
+
+    def __len__(self):                           # not really used
+        return len(self.labels) // (self.k * self.n_cls)

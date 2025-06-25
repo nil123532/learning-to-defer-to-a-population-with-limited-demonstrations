@@ -297,7 +297,8 @@ def load_from_checkpoint(train_dir, model, ema_model, optimizer, scheduler, mode
     try:
         checkpoint = torch.load(cp_dir,weights_only=False)
         model.load_state_dict(checkpoint['model'])
-        ema_model.load_state_dict(checkpoint['ema_model'])
+        if ema_model is not None:
+            ema_model.load_state_dict(checkpoint['ema_model']) 
         optimizer.load_state_dict(checkpoint['optimizer'])
         scheduler.load_state_dict(checkpoint['lr_scheduler'])
         epoch = checkpoint['epoch'] + 1

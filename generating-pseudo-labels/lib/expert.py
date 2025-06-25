@@ -51,6 +51,11 @@ class SyntheticExpertOverlap():
                     if coin_flip == 1:
                         outs[i] = labels[i]
                     if coin_flip == 0:
-                        outs[i] = random.randint(0, self.n_classes-1) if not self.binary else 0
+                        while True:
+                            outs[i] = random.randint(0, self.n_classes-1)
+                            if outs[i] != labels[i]:  # ensure not the same as the true label
+                                break
+                        
+                        outs[i] = outs[i] if not self.binary else 0
 
         return outs

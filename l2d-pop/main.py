@@ -143,16 +143,27 @@ def _perform_evaluation_run(model,
             images_cntx = expert_cntx.xc.squeeze(0)
             targets_cntx = expert_cntx.yc.squeeze(0)
             costs_cntx = (exp_preds_cntx == targets_cntx).int()
-
+            
+            ## Head finetuning logic - manual update
+            # for _ in range(n_finetune_steps):
+            #     outputs_cntx = model(images_cntx)
+            #     loss = loss_fn(outputs_cntx, costs_cntx, targets_cntx, n_classes)
+            #     model.zero_grad()
+            #     loss.backward()
+            #     with torch.no_grad():
+            #         for param in model.params.clf.parameters():
+            #             param.copy_(param - lr_finetune * param.grad)
+             
+          
+            #optimizer for head finetuning
+            opt = torch.optim.Adam(model.params.clf.parameters(), lr=lr_finetune)
             for _ in range(n_finetune_steps):
                 outputs_cntx = model(images_cntx)
                 loss = loss_fn(outputs_cntx, costs_cntx, targets_cntx, n_classes)
-                model.zero_grad()
+                opt.zero_grad()
                 loss.backward()
-                with torch.no_grad():
-                    for param in model.params.clf.parameters():
-                        param.copy_(param - lr_finetune * param.grad)
-            
+                opt.step()
+
             if config["l2d"] == 'single':
                 model.eval()
 
@@ -632,7 +643,7 @@ def eval(model, val_data, test_data, loss_fn, experts_test, val_cntx_sampler, te
             test_cntx_sampler.reset()
             model.load_state_dict(copy.deepcopy(model_state_dict))
             metrics = evaluate(model, experts_test, loss_fn, test_cntx_sampler, config["n_classes"], test_loader, config, logger, budget, \
-                                best_finetune_steps, best_lr)
+                                best_finetune_steps, best_lr,mean_across_experts=mean_across_experts)
 
     # # Rebuttal experiment (onyl for l2d=pop)
     # for budget in config["budget"]:
@@ -642,6 +653,31 @@ def eval(model, val_data, test_data, loss_fn, experts_test, val_cntx_sampler, te
     #         model.load_state_dict(copy.deepcopy(model_state_dict))
     #         evaluate(model, experts_test, loss_fn, test_cntx_sampler, config["n_classes"], test_loader, config, logger, budget, p_cntx_inclusion=p_cntx_inclusion)
 
+
+def _make_cyclic_experts_with_overlap(num_train, num_novel, k, c, max_overlap):
+    if not (0 <= max_overlap < k):
+        raise ValueError("max_overlap must satisfy 0 ≤ max_overlap < k.")
+
+    need   = num_train + num_novel
+    chosen = []
+    last   = None
+
+    for win in itertools.combinations(range(c), k):        # no list()
+        if last is None or len(set(win) & set(last)) <= max_overlap:
+            chosen.append(list(win))
+            last = win
+            if len(chosen) == need:         # early-exit: we’re done
+                break
+
+    if len(chosen) < need:
+        raise RuntimeError("Could not find enough windows with the given "
+                           "max_overlap.  Increase max_overlap or k.")
+
+    train_oracles = {f"Train_{i}": chosen[i] for i in range(num_train)}
+    novel_oracles = {f"Novel_{i}": chosen[num_train + i]
+                     for i in range(num_novel)}
+    return train_oracles, novel_oracles
+
 def build_experts(dataset,n_classes,p_out,n_experts,expert_labels):
     """
     Returns
@@ -649,23 +685,28 @@ def build_experts(dataset,n_classes,p_out,n_experts,expert_labels):
     experts_train : list
     experts_test  : list
     """
-    k = int(p_out)                      # number of oracle classes
+    k = int(p_out)                 
+    max_overlap = (k - 1) if dataset.lower() in {"cifar10", "fashion"} else (k -7)
     experts_train, experts_test = [], []
 
-    # ------------------------------------------------------------
-    # 1) datasets that use SyntheticExpertOverlap
-    # ------------------------------------------------------------
-    if dataset in {"gtsrb", "cifar10", "fashion"}:
-        TOTAL = math.comb(n_classes, k)
-        STEP  = 17
+    # ------------------------------------------------------------------
+    # 1) DATASETS THAT USE CYCLIC CONSTRUCTION
+    # ------------------------------------------------------------------
+    if dataset.lower() in {"gtsrb", "cifar10", "fashion"}:
+        num_train = n_experts
+        num_novel = n_experts // 2          # same split as before (50 % novel)
 
-        # ---- build training experts ----
-        for i in range(n_experts):
-            r = (i * STEP) % TOTAL
-            if k == 1:
-                oracle = i % n_classes
-            else:
-                oracle = next(islice(combinations(range(n_classes), k), r, None))
+        # Generate oracle class sets
+        train_oracles, novel_oracles = _make_cyclic_experts_with_overlap(
+            num_train=num_train,
+            num_novel=num_novel,
+            k=k,
+            c=n_classes,
+            max_overlap=max_overlap        
+        )
+
+        # ---- build TRAIN experts ----
+        for oracle in train_oracles.values():
             experts_train.append(
                 SyntheticExpertOverlap(
                     classes_oracle=oracle,
@@ -675,16 +716,10 @@ def build_experts(dataset,n_classes,p_out,n_experts,expert_labels):
                 )
             )
 
-        # ---- build test experts ----
-        half = n_experts // 2
-        experts_test.extend(experts_train[:half])   # 50 % from train
-
-        for i in range(half):                       # 50 % new experts
-            r = ((i + 10) * STEP) % TOTAL
-            if k == 1:
-                oracle = (i + 15) % n_classes
-            else:
-                oracle = next(islice(combinations(range(n_classes), k), r, None))
+        # ---- build TEST experts ----
+        half = num_train // 2
+        experts_test.extend(experts_train[:half])  # 50 % reused
+        for oracle in novel_oracles.values():      # 50 % brand-new
             experts_test.append(
                 SyntheticExpertOverlap(
                     classes_oracle=oracle,
@@ -694,8 +729,6 @@ def build_experts(dataset,n_classes,p_out,n_experts,expert_labels):
                 )
             )
 
-        if dataset == "cifar10":                    # keep old quirk
-            experts_test.extend(experts_train)
 
     # ------------------------------------------------------------
     # 2) datasets that load pre-computed label arrays
@@ -720,9 +753,105 @@ def build_experts(dataset,n_classes,p_out,n_experts,expert_labels):
 
     return experts_train, experts_test
 
+def build_experts_original(config):
+    """
+    Sample experts exactly like the in-line code snippet provided.
+
+    Rules
+    -----
+    • If 'gtsrb' is in the dataset name (case-insensitive):
+        – Each expert knows 5 oracle classes (chosen without replacement).
+    • If 'cifar' or 'fashion' is in the dataset name:
+        – Each expert knows exactly one oracle class.
+    • Any other dataset also defaults to one oracle class.
+
+    The test set = 50 % reused training experts + 50 % newly sampled experts.
+
+    Required `config` fields
+    ------------------------
+    'dataset'    : str   (e.g. 'gtsrb', 'cifar10', 'fashion_mnist')
+    'n_classes'  : int   total number of classes
+    'p_out'      : float probability of incorrect label outside oracle set
+    'n_experts'  : int   number of **training** experts to generate
+    """
+    name         = config["dataset"].lower()
+    n_total_cls  = config["n_classes"]
+    p_out        = config["p_out"]
+    n_experts    = config["n_experts"]
+
+    experts_train, experts_test = [], []
+
+    # ------------- GTSRB: 5-class oracles -----------------
+    if "gtsrb" in name:
+        n_classes_oracle = 5
+
+        # TRAIN experts
+        for _ in range(n_experts):
+            classes_oracle = np.random.choice(
+                np.arange(n_total_cls), size=n_classes_oracle, replace=False
+            )
+            print(f"classes_oracle: {classes_oracle}")          # debug
+            experts_train.append(
+                SyntheticExpertOverlap(
+                    classes_oracle=classes_oracle,
+                    n_classes=n_total_cls,
+                    p_in=1.0,
+                    p_out=p_out,
+                )
+            )
+
+        # TEST experts: 50 % reused + 50 % new
+        half = n_experts // 2
+        experts_test.extend(experts_train[:half])
+        for _ in range(half):
+            classes_oracle = np.random.choice(
+                np.arange(n_total_cls), size=n_classes_oracle, replace=False
+            )
+            print(f"classes_oracle: {classes_oracle}")          # debug
+            experts_test.append(
+                SyntheticExpertOverlap(
+                    classes_oracle=classes_oracle,
+                    n_classes=n_total_cls,
+                    p_in=1.0,
+                    p_out=p_out,
+                )
+            )
+
+    # ------------- CIFAR / FASHION (and others): 1-class oracles -------------
+    else:
+        # TRAIN experts
+        for _ in range(n_experts):
+            class_oracle = random.randint(0, n_total_cls - 1)
+            print(f"class_oracle: {class_oracle}")              # debug
+            experts_train.append(
+                SyntheticExpertOverlap(
+                    classes_oracle=class_oracle,
+                    n_classes=n_total_cls,
+                    p_in=1.0,
+                    p_out=p_out,
+                )
+            )
+
+        # TEST experts: 50 % reused + 50 % new
+        half = n_experts // 2
+        experts_test.extend(experts_train[:half])
+        for _ in range(half):
+            class_oracle = random.randint(0, n_total_cls - 1)
+            print(f"class_oracle: {class_oracle}")              # debug
+            experts_test.append(
+                SyntheticExpertOverlap(
+                    classes_oracle=class_oracle,
+                    n_classes=n_total_cls,
+                    p_in=1.0,
+                    p_out=p_out,
+                )
+            )
+
+    return experts_train, experts_test
+
 def main(config):
     set_seed(config["seed"])
-    config["ckp_dir"] = f"./runs/{config['dataset']}/{config['loss_type']}/l2d_{config['l2d']}/{config['train_type']}/e_{str(config['expert_labels'])}_p{str(config['p_out'])}_seed{str(config['seed'])}"
+    config["ckp_dir"] = f"./runs/{config['dataset']}/{config['expert_type']}/{config['loss_type']}/l2d_{config['l2d']}/{config['train_type']}/e_{str(config['expert_labels'])}_p{str(config['p_out'])}_seed{str(config['seed'])}"
     # config["ckp_dir"] = f"./runs/{config['dataset']}/{config['loss_type']}/l2d_{config['l2d']}_lr{config['lr_maml']}_s{config['n_steps_maml']}/p{str(config['p_out'])}_seed{str(config['seed'])}" # tuning MAML
     os.makedirs(config["ckp_dir"], exist_ok=True)
    
@@ -736,6 +865,9 @@ def main(config):
     elif config["dataset"] == "generated_expert_labels_gtsrb":
         config["n_classes"] = 43
         train_data, val_data, test_data = load_gtsrb(expert_type="generated_experts")
+
+        #debug checking for finetune by training on low data 
+        # train_data , val_data, test_data = load_gtsrb(expert_type="limited_demo")
         # resnet_base = resnet20(norm_type=config["norm_type"])
         # n_features = resnet_base.n_features
         resnet_base = WideResNetBase(depth=28, n_channels=3, widen_factor=2, dropRate=0.0, norm_type=config["norm_type"])
@@ -757,7 +889,7 @@ def main(config):
     #GTSRB - sparse labels
     elif config["dataset"] == 'gtsrb':
         config["n_classes"] = 43
-        train_data, val_data, test_data = load_gtsrb(expert_type="limited_demo")    
+        train_data, val_data, test_data = load_gtsrb(expert_type="limited_demo") 
         # resnet_base = resnet20(norm_type=config["norm_type"])
         # n_features = resnet_base.n_features
         resnet_base = WideResNetBase(depth=28, n_channels=3, widen_factor=2, dropRate=0.0, norm_type=config["norm_type"])
@@ -831,7 +963,7 @@ def main(config):
             new_state.update(load_state)
             model.load_state_dict(new_state,strict=False)
 
-            print("Loading warmstart model")
+            print("Loading warmstart model and attention weights")
 
         elif config["train_type"] == 'w':
             resnet_base.load_state_dict(checkpoint['model_state_dict'],strict=False)    
@@ -840,12 +972,7 @@ def main(config):
                                                     with_attn=with_attn, with_softmax=with_softmax, decouple=config["decouple"], \
                                                     depth_embed=config["depth_embed"], depth_rej=config["depth_reject"], train_type=config["train_type"])
             print("Loading warmstart model")
-
-
-          
-
-  
-            
+ 
 
 
     #for single l2d
@@ -854,18 +981,30 @@ def main(config):
         resnet_base = resnet_base.to(device)
         model = ClassifierRejector(resnet_base, num_classes=int(config["n_classes"]), n_features=n_features, with_softmax=with_softmax, \
                                    decouple=config["decouple"])
+        print("Loading warmstart model")
     
     config["n_experts"] = 10 # assume exactly divisible by 2 
     experts_train = []
     experts_test = []
 
-    experts_train, experts_test = build_experts(
-        dataset=config["dataset"],
-        n_classes=config["n_classes"],
-        p_out=int(config["p_out"]),
-        n_experts=config["n_experts"],
-        expert_labels=config.get("expert_labels", None)
-    )       
+    if config["expert_type"] == 'H':
+        experts_train, experts_test = build_experts(
+            dataset=config["dataset"],
+            n_classes=config["n_classes"],
+            p_out=int(config["p_out"]),
+            n_experts=config["n_experts"],
+            expert_labels=config.get("expert_labels", None)
+        )       
+    else:
+        experts_train, experts_test = build_experts_original(config)
+
+
+    #make logger for expert
+    # exp_logger = get_logger(os.path.join(config["ckp_dir"], "experts.log"))
+    # for expert in experts_train:
+    #     exp_logger.info(f"Train expert: {expert.classes_oracle}")
+    # for expert in experts_test:
+    #     exp_logger.info(f"Test expert: {expert.classes_oracle}")
 
     # Context sampler train-time: just take from full train set (potentially with data augmentation)
     kwargs = {'num_workers': 0, 'pin_memory': True}
@@ -985,6 +1124,8 @@ if __name__ == "__main__":
     #Important when loading pretrained models for either generated labels or limited demonstrations
     parser.add_argument('--train_type',type=str,required=True)
     
+    #expert definition
+    parser.add_argument('--expert_type', choices=["H","P"],required=True)
     
 
     config = parser.parse_args().__dict__
