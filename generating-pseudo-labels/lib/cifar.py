@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
-from torchvision.datasets import GTSRB, FashionMNIST
+from torchvision.datasets import GTSRB, FashionMNIST, CIFAR10
 from torch.utils.data import Dataset
 
 from lib import transform as T
@@ -87,6 +87,9 @@ def  load_data_train(L=250, dataset='CIFAR10', dspth='./data'):
     """
 
     if dataset == 'CIFAR10':
+        #download cifar10 dataset
+        _ = CIFAR10(root=dspth, train=True, download=True)
+        _ = CIFAR10(root=dspth, train=False, download=True)
         datalist = [
             osp.join(dspth, 'cifar-10-batches-py', 'data_batch_{}'.format(i + 1))
             for i in range(5)
