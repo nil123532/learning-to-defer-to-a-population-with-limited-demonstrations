@@ -849,6 +849,10 @@ def build_experts_original(config):
 
     return experts_train, experts_test
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 318f51fafba8e9b2a3b03a5f57f842c54fb65e1d
 def move_ckpt_to_run(config):
     """
     Move the pre-computed expert-label checkpoint that matches `config['p_out']`
@@ -865,7 +869,11 @@ def move_ckpt_to_run(config):
     # mapping: p_out  -> “pXX.X” piece in the filename
     p_tag = (
         {0.2: "8.0", 0.5: "21.0", 0.8: "30.0"} if is_gtsrb else
+<<<<<<< HEAD
         {0.2: "2.0", 0.5: "0.5", 0.8: "0.8"}
+=======
+        {0.2: "2.0", 0.5: "5.0", 0.8: "8.0"}
+>>>>>>> 318f51fafba8e9b2a3b03a5f57f842c54fb65e1d
     ).get(p_out)
 
     if p_tag is None:
@@ -875,9 +883,15 @@ def move_ckpt_to_run(config):
     base_dir = (
         f"./runs/generated_expert_labels_gtsrb/H/softmax/l2d_{config['l2d']}/w"
         if is_gtsrb
+<<<<<<< HEAD
         else f"./runs/generated_expert_labels_{config['dataset']}/H/softmax/l2d_{config['l2d']}/w"
     )
     src_ckpt = os.path.join(base_dir, f"e_473_p{p_tag}_seed0", "default.pt")
+=======
+        else f"./runs/{config['dataset']}/H/softmax/l2d_{config['l2d']}/w"
+    )
+    src_ckpt = os.path.join(base_dir, f"e_{str(config['expert_labels'])}_p{p_tag}_seed0", "default.pt")
+>>>>>>> 318f51fafba8e9b2a3b03a5f57f842c54fb65e1d
     dst_ckpt = os.path.join(config["ckp_dir"], "default.pt")
 
     # --- create dest directory (if needed) and move the file -----------------
@@ -895,7 +909,11 @@ def main(config):
     if config['p_out'] in [0.2,0.5,0.8] and 'generated' in config["dataset"]:
         # Move the pre-computed expert-label checkpoint to the run directory
         move_ckpt_to_run(config)
+<<<<<<< HEAD
         
+=======
+   
+>>>>>>> 318f51fafba8e9b2a3b03a5f57f842c54fb65e1d
     #Cifar10 - augmented labels
     if config["dataset"] == "generated_expert_labels_cifar":
         config["n_classes"] = 10
@@ -994,7 +1012,11 @@ def main(config):
                 if k in new_state and v.shape == new_state[k].shape:
                     load_state[k] = v
 
+<<<<<<< HEAD
             # # Optional — see what didn’t match
+=======
+            # Optional — see what didn’t match
+>>>>>>> 318f51fafba8e9b2a3b03a5f57f842c54fb65e1d
             missing = [k for k in new_state.keys() if k not in load_state]
             unexpected = [k for k in old_state.keys() if k not in new_state]
             print("Will load   :", list(load_state.keys()), "...")

@@ -773,6 +773,7 @@ def main():
                 logger.info("Epoch {}. F0.5: {:.4f}".format(epoch, f05_model))
 
     logger.info("Generate predictions for experts...")
+    pred_dir = f'{args.dataset.lower()}/L_{args.n_labeled}_p{int(args.p_out)}'
     if 'cifar' in args.dataset.lower():
         for idx_exp, expert in enumerate(experts_train):
             print("Expert:",idx_exp+1)
@@ -780,10 +781,10 @@ def main():
                                                   experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,idx_exp,args)   
             logger.info(f"Train_u accuracy: {accs['train_u']:.4f}")
             logger.info(f"Validation accuracy: {accs['val']:.4f}")
-            if not os.path.exists('./artificial_expert_labels/'):
-                os.makedirs('./artificial_expert_labels/')
+            if not os.path.exists(f'./artificial_expert_labels/{pred_dir}'):
+                os.makedirs(f'./artificial_expert_labels/{pred_dir}')
             pred_file = f'expert_{idx_exp + 1}_{args.dataset.lower()}_expert{args.ex_strength}.{args.seed}@{args.n_labeled}_predictions.json'
-            with open(f'artificial_expert_labels/{pred_file}', 'w') as f:
+            with open(f'artificial_expert_labels/{pred_dir}/{pred_file}', 'w') as f:
                 json.dump(predictions, f)
 
         # generate predictions for last 5 test experts
@@ -793,10 +794,10 @@ def main():
                                                   experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,idx_exp+15,args)   
             logger.info(f"Train_u accuracy: {accs['train_u']:.4f}")
             logger.info(f"Validation accuracy: {accs['val']:.4f}")
-            if not os.path.exists('./artificial_expert_labels/'):
-                os.makedirs('./artificial_expert_labels/')
+            if not os.path.exists(f'./artificial_expert_labels/{pred_dir}'):
+                os.makedirs(f'./artificial_expert_labels/{pred_dir}')
             pred_file = f'expert_{idx_exp + 10 + 1}_{args.dataset.lower()}_expert{args.ex_strength}.{args.seed}@{args.n_labeled}_predictions.json'
-            with open(f'artificial_expert_labels/{pred_file}', 'w') as f:
+            with open(f'artificial_expert_labels/{pred_dir}/{pred_file}', 'w') as f:
                 json.dump(predictions, f)
         
     elif 'gtsrb' in args.dataset.lower():
@@ -805,12 +806,12 @@ def main():
                 predictions, accs = predict_gtsrb_acc(model, ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert,
                                                     experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,idx_exp,args)   
         
-                if not os.path.exists('./artificial_expert_labels/'):
-                    os.makedirs('./artificial_expert_labels/')
+                if not os.path.exists(f'./artificial_expert_labels/{pred_dir}'):
+                    os.makedirs(f'./artificial_expert_labels/{pred_dir}')
                 pred_file = f'expert_{idx_exp + 1}_{args.dataset.lower()}_expert{args.ex_strength}.{args.seed}@{args.n_labeled}_predictions.json'
                 logger.info(f"Train_u accuracy: {accs['train_u']:.4f}")
                 logger.info(f"Validation accuracy: {accs['val']:.4f}")
-                with open(f'artificial_expert_labels/{pred_file}', 'w') as f:
+                with open(f'artificial_expert_labels/{pred_dir}/{pred_file}', 'w') as f:
                     json.dump(predictions, f)
         # generate predictions for last 5 test experts
         for idx_exp, expert_test in enumerate(experts_test[-5:]):
@@ -818,12 +819,12 @@ def main():
             predictions, accs = predict_gtsrb_acc(model,ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert_test,
                                                     experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,idx_exp+15,args)   
 
-            if not os.path.exists('./artificial_expert_labels/'):
-                os.makedirs('./artificial_expert_labels/')
+            if not os.path.exists(f'./artificial_expert_labels/{pred_dir}'):
+                os.makedirs(f'./artificial_expert_labels/{pred_dir}')
             pred_file = f'expert_{idx_exp + 10 + 1}_{args.dataset.lower()}_expert{args.ex_strength}.{args.seed}@{args.n_labeled}_predictions.json'
             logger.info(f"Train_u accuracy: {accs['train_u']:.4f}")
             logger.info(f"Validation accuracy: {accs['val']:.4f}")
-            with open(f'artificial_expert_labels/{pred_file}', 'w') as f:
+            with open(f'artificial_expert_labels/{pred_dir}/{pred_file}', 'w') as f:
                 json.dump(predictions, f)
             
     elif 'fashion' in args.dataset.lower():
@@ -833,10 +834,10 @@ def main():
             predictions, accs = predict_fashion_acc(model, ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert,
                                                   experts_train_bin[idx_exp],train_cntx_sampler,val_cntx_sampler,args)   
      
-            if not os.path.exists('./artificial_expert_labels/'):
-                os.makedirs('./artificial_expert_labels/')
+            if not os.path.exists(f'./artificial_expert_labels/{pred_dir}'):
+                os.makedirs(f'./artificial_expert_labels/{pred_dir}')
             pred_file = f'expert_{idx_exp + 1}_{args.dataset.lower()}_expert{args.ex_strength}.{args.seed}@{args.n_labeled}_predictions.json'
-            with open(f'artificial_expert_labels/{pred_file}', 'w') as f:
+            with open(f'artificial_expert_labels/{pred_dir}/{pred_file}', 'w') as f:
                 json.dump(predictions, f)
             logger.info(f"Train_u accuracy: {accs['train_u']:.4f}")
             logger.info(f"Validation accuracy: {accs['val']:.4f}")
@@ -846,10 +847,10 @@ def main():
             predictions, accs = predict_fashion_acc(model,ema_model, emb_model, dl_x_eval, dl_u_eval, dlval,expert_test,
                                                   experts_test_bin[idx_exp+5],train_cntx_sampler,val_cntx_sampler,args)   
 
-            if not os.path.exists('./artificial_expert_labels/'):
-                os.makedirs('./artificial_expert_labels/')
+            if not os.path.exists(f'./artificial_expert_labels/{pred_dir}'):
+                os.makedirs(f'./artificial_expert_labels/{pred_dir}')
             pred_file = f'expert_{idx_exp + 10 + 1}_{args.dataset.lower()}_expert{args.ex_strength}.{args.seed}@{args.n_labeled}_predictions.json'
-            with open(f'artificial_expert_labels/{pred_file}', 'w') as f:
+            with open(f'artificial_expert_labels/{pred_dir}/{pred_file}', 'w') as f:
                 json.dump(predictions, f)
             logger.info(f"Train_u accuracy: {accs['train_u']:.4f}")
             logger.info(f"Validation accuracy: {accs['val']:.4f}")
