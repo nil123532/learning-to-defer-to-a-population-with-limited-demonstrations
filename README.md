@@ -25,3 +25,9 @@ python train_embedding_fm.py --exp-dir expert_1  --n-labeled 500 --ex_strength 9
 python train_embedding_fm.py --exp-dir expert_1  --n-labeled 473 --ex_strength 4  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 4 --with-attn mlp --finetune &&
 python train_embedding_fm.py --exp-dir expert_1  --n-labeled 473 --ex_strength 21  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 21 --with-attn mlp --finetune &&
 python train_embedding_fm.py --exp-dir expert_1  --n-labeled 473 --ex_strength 38  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 38 --with-attn mlp --finetune
+
+
+
+bash train_generated_experts_gtsrb.sh single 21 train 0 473 w H && bash train_generated_experts_gtsrb.sh single 30 train 0 473 w H
+bash train_generated_experts_fashion.sh single 2 train 0 500 w H && bash train_generated_experts_fashion.sh single 5 train 0 500 w H && bash train_generated_experts_fashion.sh single 8 train 0 500 w H
+bash train_generated_experts_cifar.sh single 2 train 0 500 w H && bash train_generated_experts_cifar.sh single 5 train 0 500 w H && bash train_generated_experts_cifar.sh single 8 train 0 500 w H

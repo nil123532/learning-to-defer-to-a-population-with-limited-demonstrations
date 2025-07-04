@@ -612,38 +612,38 @@ def eval(model, val_data, test_data, loss_fn, experts_test, val_cntx_sampler, te
             evaluate(model, experts_test, loss_fn, test_cntx_sampler, config["n_classes"], test_loader, config, logger, \
                      budget,mean_across_experts=mean_across_experts)
         
-        if (config["l2d"] == 'single_maml') or ((config["l2d"] == 'single') and config["finetune_single"]):
-            logger = get_logger(os.path.join(config["ckp_dir"], "eval{}_finetune.log".format(budget)))
+        # if (config["l2d"] == 'single_maml') or ((config["l2d"] == 'single') and config["finetune_single"]):
+        #     logger = get_logger(os.path.join(config["ckp_dir"], "eval{}_finetune.log".format(budget)))
             
-            n_finetune_steps_lst = [n_steps for n_steps in config["n_finetune_steps"] if n_steps >= config["n_steps_maml"]] \
-                                    if (config["l2d"] == 'single_maml') else config["n_finetune_steps"]
-            lr_finetune_lst = [config["lr_maml"]] if (config["l2d"] == 'single_maml') else config["lr_finetune"]
+        #     n_finetune_steps_lst = [n_steps for n_steps in config["n_finetune_steps"] if n_steps >= config["n_steps_maml"]] \
+        #                             if (config["l2d"] == 'single_maml') else config["n_finetune_steps"]
+        #     lr_finetune_lst = [config["lr_maml"]] if (config["l2d"] == 'single_maml') else config["lr_finetune"]
 
-            steps_lr_comb = list(itertools.product(n_finetune_steps_lst, lr_finetune_lst))
-            val_scores = []
-            for (n_steps, lr) in steps_lr_comb:
-                print(f'no. finetune steps: {n_steps}  step size: {lr}')
-                val_cntx_sampler.reset()
-                model.load_state_dict(copy.deepcopy(model_state_dict))
-                #NR - Change to expert train because that's where the data is for the generated expert labels scenario
-                if config["dataset"] == "generated_expert_labels_cifar" or config["dataset"] == "generated_expert_labels_fashion":
-                    metrics = evaluate(model, experts_train, loss_fn, val_cntx_sampler, config["n_classes"], val_loader, config, None, budget, \
-                                n_steps, lr,mean_across_experts=False)
-                elif config["dataset"] == "generated_expert_labels_gtsrb":
-                    metrics = evaluate(model, experts_test, loss_fn, val_cntx_sampler, config["n_classes"], val_loader, config, None, budget, \
-                                n_steps, lr,mean_across_experts=False)
+        #     steps_lr_comb = list(itertools.product(n_finetune_steps_lst, lr_finetune_lst))
+        #     val_scores = []
+        #     for (n_steps, lr) in steps_lr_comb:
+        #         print(f'no. finetune steps: {n_steps}  step size: {lr}')
+        #         val_cntx_sampler.reset()
+        #         model.load_state_dict(copy.deepcopy(model_state_dict))
+        #         #NR - Change to expert train because that's where the data is for the generated expert labels scenario
+        #         if config["dataset"] == "generated_expert_labels_cifar" or config["dataset"] == "generated_expert_labels_fashion":
+        #             metrics = evaluate(model, experts_train, loss_fn, val_cntx_sampler, config["n_classes"], val_loader, config, None, budget, \
+        #                         n_steps, lr,mean_across_experts=False)
+        #         elif config["dataset"] == "generated_expert_labels_gtsrb":
+        #             metrics = evaluate(model, experts_test, loss_fn, val_cntx_sampler, config["n_classes"], val_loader, config, None, budget, \
+        #                         n_steps, lr,mean_across_experts=False)
 
-                else:
-                    metrics = evaluate(model, experts_test, loss_fn, val_cntx_sampler, config["n_classes"], val_loader, config, None, budget, \
-                                n_steps, lr,mean_across_experts=False)
-                score = metrics[scoring_rule] if scoring_rule=='val_loss' else -metrics[scoring_rule]
-                val_scores.append(score)
-            idx = np.nanargmin(np.array(val_scores))
-            best_finetune_steps, best_lr = steps_lr_comb[idx]
-            test_cntx_sampler.reset()
-            model.load_state_dict(copy.deepcopy(model_state_dict))
-            metrics = evaluate(model, experts_test, loss_fn, test_cntx_sampler, config["n_classes"], test_loader, config, logger, budget, \
-                                best_finetune_steps, best_lr,mean_across_experts=mean_across_experts)
+        #         else:
+        #             metrics = evaluate(model, experts_test, loss_fn, val_cntx_sampler, config["n_classes"], val_loader, config, None, budget, \
+        #                         n_steps, lr,mean_across_experts=False)
+        #         score = metrics[scoring_rule] if scoring_rule=='val_loss' else -metrics[scoring_rule]
+        #         val_scores.append(score)
+        #     idx = np.nanargmin(np.array(val_scores))
+        #     best_finetune_steps, best_lr = steps_lr_comb[idx]
+        #     test_cntx_sampler.reset()
+        #     model.load_state_dict(copy.deepcopy(model_state_dict))
+        #     metrics = evaluate(model, experts_test, loss_fn, test_cntx_sampler, config["n_classes"], test_loader, config, logger, budget, \
+        #                         best_finetune_steps, best_lr,mean_across_experts=mean_across_experts)
 
     # # Rebuttal experiment (onyl for l2d=pop)
     # for budget in config["budget"]:
@@ -849,11 +849,53 @@ def build_experts_original(config):
 
     return experts_train, experts_test
 
+
+def move_ckpt_to_run(config):
+    """
+    Move the pre-computed expert-label checkpoint that matches `config['p_out']`
+    into `config['ckp_dir']`.
+
+    Expected `p_out` values: 0.2, 0.5, or 0.8.
+    Works for GTSRB and any other dataset.
+    """
+
+    # --- figure out which source file we need --------------------------------
+    p_out = float(config["p_out"])
+    is_gtsrb = "gtsrb" in config["dataset"].lower()
+
+    # mapping: p_out  -> “pXX.X” piece in the filename
+    p_tag = (
+        {0.2: "8.0", 0.5: "21.0", 0.8: "30.0"} if is_gtsrb else
+        {0.2: "2.0", 0.5: "5.0", 0.8: "8.0"}
+    ).get(p_out)
+
+    if p_tag is None:
+        raise ValueError(f"Unsupported p_out={p_out}. Expected 0.2, 0.5 or 0.8.")
+
+    # base directory differs only for GTSRB
+    base_dir = (
+        f"./runs/generated_expert_labels_gtsrb/H/softmax/l2d_{config['l2d']}/w"
+        if is_gtsrb
+        else f"./runs/{config['dataset']}/H/softmax/l2d_{config['l2d']}/w"
+    )
+    src_ckpt = os.path.join(base_dir, f"e_{str(config['expert_labels'])}_p{p_tag}_seed0", "default.pt")
+    dst_ckpt = os.path.join(config["ckp_dir"], "default.pt")
+
+    # --- create dest directory (if needed) and move the file -----------------
+    os.makedirs(config["ckp_dir"], exist_ok=True)
+    shutil.copy(src_ckpt, dst_ckpt)          
+
+    print(f"✓ Moved checkpoint\n   from: {src_ckpt}\n     to: {dst_ckpt}")
+
 def main(config):
     set_seed(config["seed"])
     config["ckp_dir"] = f"./runs/{config['dataset']}/{config['expert_type']}/{config['loss_type']}/l2d_{config['l2d']}/{config['train_type']}/e_{str(config['expert_labels'])}_p{str(config['p_out'])}_seed{str(config['seed'])}"
     # config["ckp_dir"] = f"./runs/{config['dataset']}/{config['loss_type']}/l2d_{config['l2d']}_lr{config['lr_maml']}_s{config['n_steps_maml']}/p{str(config['p_out'])}_seed{str(config['seed'])}" # tuning MAML
     os.makedirs(config["ckp_dir"], exist_ok=True)
+
+    if config['p_out'] in [0.2,0.5,0.8] and 'generated' in config["dataset"]:
+        # Move the pre-computed expert-label checkpoint to the run directory
+        move_ckpt_to_run(config)
    
     #Cifar10 - augmented labels
     if config["dataset"] == "generated_expert_labels_cifar":
@@ -953,12 +995,12 @@ def main(config):
                 if k in new_state and v.shape == new_state[k].shape:
                     load_state[k] = v
 
-            # # Optional — see what didn’t match
-            # missing = [k for k in new_state.keys() if k not in load_state]
-            # unexpected = [k for k in old_state.keys() if k not in new_state]
-            # print("Will load   :", list(load_state.keys()), "...")
-            # print("Missing     :", missing)
-            # print("Unexpected  :", unexpected)
+            # Optional — see what didn’t match
+            missing = [k for k in new_state.keys() if k not in load_state]
+            unexpected = [k for k in old_state.keys() if k not in new_state]
+            print("Will load   :", list(load_state.keys()), "...")
+            print("Missing     :", missing)
+            print("Unexpected  :", unexpected)
 
             new_state.update(load_state)
             model.load_state_dict(new_state,strict=False)
@@ -966,7 +1008,7 @@ def main(config):
             print("Loading warmstart model and attention weights")
 
         elif config["train_type"] == 'w':
-            resnet_base.load_state_dict(checkpoint['model_state_dict'],strict=False)    
+            # resnet_base.load_state_dict(checkpoint['model_state_dict'],strict=False)    
             resnet_base = resnet_base.to(device)
             model = ClassifierRejectorWithContextEmbedder(resnet_base, num_classes=int(config["n_classes"]), n_features=n_features, \
                                                     with_attn=with_attn, with_softmax=with_softmax, decouple=config["decouple"], \
@@ -977,7 +1019,7 @@ def main(config):
 
     #for single l2d
     else:
-        resnet_base.load_state_dict(checkpoint['model_state_dict'],strict=False)
+        # resnet_base.load_state_dict(checkpoint['model_state_dict'],strict=False)
         resnet_base = resnet_base.to(device)
         model = ClassifierRejector(resnet_base, num_classes=int(config["n_classes"]), n_features=n_features, with_softmax=with_softmax, \
                                    decouple=config["decouple"])

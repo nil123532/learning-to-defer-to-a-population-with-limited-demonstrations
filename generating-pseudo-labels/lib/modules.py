@@ -142,7 +142,6 @@ class ClassifierRejectorWithContextEmbedder(nn.Module):
         self.fc = nn.Linear(n_features+dim_hid, num_classes)
         self.fc.bias.data.zero_()
 
-        self.embed_class_m = nn.Embedding(actual_classes, dim_class_embed) # created a class embedding layer
         self.embed_class = nn.Embedding(actual_classes, dim_class_embed) # created a class embedding layer
 
         self.film = FiLM(n_features, dim_hid) if use_film else None
@@ -206,7 +205,7 @@ class ClassifierRejectorWithContextEmbedder(nn.Module):
    
 
         yc_embed = self.embed_class(cntxt.yc) # [E,Nc,H]
-        mc_embed = self.embed_class_m(cntxt.mc) # [E,Nc,H]
+        mc_embed = self.embed_class(cntxt.mc) # [E,Nc,H]
         out = torch.cat([xc_embed,yc_embed,mc_embed], -1) # [E,Nc,Dx+2H]
 
 
