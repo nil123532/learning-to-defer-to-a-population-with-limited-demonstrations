@@ -20,7 +20,7 @@ from torch.utils.data import ConcatDataset, random_split
 from itertools import combinations,islice
 from math import comb
 from collections import OrderedDict
-
+from itertools import chain
 
 
 # local imports
@@ -528,16 +528,62 @@ def train(model,
     scheduler_base = torch.optim.lr_scheduler.SequentialLR(optimizer_base, [scheduler_base_cosine,scheduler_base_constant], 
                                                            milestones=[len(train_loader)*milestone_epoch])
 
-    parameter_group = [{'params': model.params.clf.parameters()}]
-    if config["l2d"] == "pop":
-        parameter_group += [{'params': model.params.rej.parameters()}]
-    optimizer_new = torch.optim.Adam(parameter_group, lr=lr_clf_rej)    
-    scheduler_new_cosine = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_new, len(train_loader)*milestone_epoch, eta_min=lr_clf_rej/1000)
-    scheduler_new_constant = torch.optim.lr_scheduler.ConstantLR(optimizer_new, factor=1., total_iters=0)
-    scheduler_new_constant.base_lrs = [lr_clf_rej/1000 for _ in optimizer_new.param_groups]
-    scheduler_new = torch.optim.lr_scheduler.SequentialLR(optimizer_new, [scheduler_new_cosine,scheduler_new_constant], 
-                                                          milestones=[len(train_loader)*milestone_epoch])
+    if config["train_type"] == "w":
+        parameter_group = [{'params': model.params.clf.parameters()}]
+        if config["l2d"] == "pop":
+            parameter_group += [{'params': model.params.rej.parameters()}]
+        optimizer_new = torch.optim.Adam(parameter_group, lr=lr_clf_rej)    
+        scheduler_new_cosine = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer_new, len(train_loader)*milestone_epoch, eta_min=lr_clf_rej/1000)
+        scheduler_new_constant = torch.optim.lr_scheduler.ConstantLR(optimizer_new, factor=1., total_iters=0)
+        scheduler_new_constant.base_lrs = [lr_clf_rej/1000 for _ in optimizer_new.param_groups]
+        scheduler_new = torch.optim.lr_scheduler.SequentialLR(optimizer_new, [scheduler_new_cosine,scheduler_new_constant], 
+                                                            milestones=[len(train_loader)*milestone_epoch])
+    if config["train_type"] == "lf":  
 
+
+        ft_scale = 0.1   # 10× lower LR for the pre-trained context
+
+        # ------------------------------------------------------------------
+        # heads (normal LR)  +  context (lower LR)
+        # ------------------------------------------------------------------
+        ft_scale = 0.01          
+
+        # 1) heads  ───────────────────────────────────────────
+        heads_params = model.params.clf.parameters()            # classifier
+        # 2) rejector only  ───────────────────────────────────
+        # grab *just* the rejector to avoid the context modules
+        rejector_params = model.rejector.parameters()
+
+        # 3) context (pre-trained)  ───────────────────────────
+        context_params = chain(model.embed_class.parameters(),
+                            model.embed.parameters())
+
+        # Build optimiser without duplicates
+        optimizer_new = torch.optim.Adam([
+            {'params': heads_params,     'lr': lr_clf_rej},          # normal LR
+            {'params': rejector_params,  'lr': lr_clf_rej},          # normal LR
+            {'params': context_params,   'lr': lr_clf_rej * ft_scale }
+        ])
+
+        # … schedulers unchanged except that
+        #    eta_min / base_lrs use each group's own LR
+        scheduler_new_cosine = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer_new,
+            len(train_loader)*milestone_epoch,
+            eta_min=min(pg['lr'] for pg in optimizer_new.param_groups) / 1000
+        )
+        scheduler_new_constant = torch.optim.lr_scheduler.ConstantLR(
+            optimizer_new, factor=1., total_iters=0
+        )
+        scheduler_new_constant.base_lrs = [
+            pg['lr'] / 1000 for pg in optimizer_new.param_groups
+        ]
+        scheduler_new = torch.optim.lr_scheduler.SequentialLR(
+            optimizer_new,
+            [scheduler_new_cosine, scheduler_new_constant],
+            milestones=[len(train_loader)*milestone_epoch]
+        )
+    # everything else is unchanged
     optimizer_lst = [optimizer_base, optimizer_new]
     scheduler_lst = [scheduler_base, scheduler_new]
 
@@ -1008,7 +1054,7 @@ def main(config):
             print("Loading warmstart model and attention weights")
 
         elif config["train_type"] == 'w':
-            # resnet_base.load_state_dict(checkpoint['model_state_dict'],strict=False)    
+            resnet_base.load_state_dict(checkpoint['model_state_dict'],strict=False)    
             resnet_base = resnet_base.to(device)
             model = ClassifierRejectorWithContextEmbedder(resnet_base, num_classes=int(config["n_classes"]), n_features=n_features, \
                                                     with_attn=with_attn, with_softmax=with_softmax, decouple=config["decouple"], \

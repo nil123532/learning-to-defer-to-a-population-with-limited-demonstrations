@@ -24,7 +24,7 @@ def evaluate_merged(model, ema_model, emb_model, dataloader, criterion, beta=0.5
             - model_f05 (float): Main model's F0.5 score.
             - ema_f05 (float): EMA model's F0.5 score (None if not present).
     """
-    choice = 8  # fix expert
+    choice = 0  # fix expert
     expert = experts_test[choice]
     expert_bin = experts_test_bin[choice]
 
