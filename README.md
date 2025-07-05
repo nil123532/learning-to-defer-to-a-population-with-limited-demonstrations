@@ -70,4 +70,3 @@ python train_embedding_fm.py --exp-dir expert_0  --n-labeled  860 --ex_strength 
 python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 8  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn --finetune &&
 python train_embedding_fm.py --exp-dir expert_0  --n-labeled 2150 --ex_strength 8  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn --finetune
 
->>>>>>> cb162ad6151aad1fd517dc704d133968bd21b203
