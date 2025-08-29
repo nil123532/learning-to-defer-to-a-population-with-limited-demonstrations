@@ -246,7 +246,7 @@ def get_cifar100_data(expert, binary=False, model='efficientnet_b1', valid=True,
         - valid_gt_data: Ground-truth label for the val data (optional)
     """
     if model != 'efficientnet_b1':
-        img_size = (224, 224)
+        img_size = (32, 32)
     else:
         img_size = (240, 240)
     stats = ((0.5074, 0.4867, 0.4411), (0.2011, 0.1987, 0.2025))
@@ -433,7 +433,7 @@ def get_cifar10_data(expert, binary=False, model='efficientnet_b1', valid=True, 
     if model != 'efficientnet_b1':
         img_size = (32, 32)
     else:
-        img_size = (240, 240)
+        img_size = (224, 224)
         stats = (0.485, 0.456, 0.406) , (0.229, 0.224, 0.225)  # specify transforms
 
     # train_transform = tt.Compose([
@@ -841,7 +841,7 @@ def load_fashion_mnist(model):
     if model != 'efficientnet_b1':
         img_size = (32, 32)
     else:
-        img_size = (32, 32)
+        img_size = (224, 224)
 
     # specify transforms
     train_transform = tt.Compose([
@@ -901,7 +901,8 @@ class GTSRB_Dataset(GTSRB):
 
 def load_gtsrb(
     root: str = "./data",
-    random_state: int = 0              # kept for API compatibility
+    random_state: int = 0,
+    model = "efficientnet_b1",
 ):
     """
     Load the German Traffic Sign Recognition Benchmark (GTSRB).
@@ -912,7 +913,11 @@ def load_gtsrb(
     val_ds   : Dataset  # full official test set (for validation)
     test_ds  : Dataset  # full official test set (for final testing)
     """
-    IMG_SIZE = (32, 32)
+
+    if model != 'efficientnet_b1':
+        IMG_SIZE = (32, 32)
+    else:
+        IMG_SIZE = (224, 224)
 
     mean = [0.3403, 0.3121, 0.3214]
     std  = [0.2724, 0.2608, 0.2669]

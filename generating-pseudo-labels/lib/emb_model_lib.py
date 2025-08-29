@@ -10,14 +10,12 @@ from sklearn.metrics import confusion_matrix, accuracy_score
 from torchvision.models.resnet import resnet50, resnet18 , resnet34
 
 
-import feature_extractor.data_loading as prep
+import lib.data_loading as prep
 
-from feature_extractor.wideresnet import WideResNetBase,WideResNet
-from feature_extractor.utils import get_train_dir, printProgressBar
-from feature_extractor.metrics import get_confusion_matrix
-from feature_extractor.resnet20 import resnet20
+from lib.wideresnet import WideResNetBase,WideResNet
+from lib.utils import get_train_dir, printProgressBar
+from lib.metrics import get_confusion_matrix
 
-from focal_loss.focal_loss import FocalLoss
 
 class EmbeddingModel:
     """Class representing the embedding model
@@ -70,17 +68,7 @@ class EmbeddingModel:
                                                                                             self.val_data,
                                                                                             batch_size=args['batch'])
                                                                                             
-        self.focal_loss = args['focal_loss']
-        weights = self.get_class_weights(self.train_loader, args['num_classes'])
-        if args['focal_loss']:
-            print('Using Focal Loss')
-            if args['weighted']:
-                self.loss_function = FocalLoss(gamma=args['gamma'], weights= weights, reduction='mean').cuda()
-            else:
-                self.loss_function = FocalLoss(gamma=args['gamma'], reduction='mean').cuda()
-        else:
-            print('Using Cross Entropy Loss')
-            self.loss_function = nn.CrossEntropyLoss(weight=weights).cuda()
+        self.loss_function = nn.CrossEntropyLoss().cuda()
 
 
         self.save_model_args()
@@ -109,11 +97,8 @@ class EmbeddingModel:
         """
         # load model
         if self.args['model'] == 'wideresnet':
-                # model = WideResNetBase(depth=28, n_channels=3, widen_factor=2, dropRate=0.0, norm_type='batchnorm',n_classes=10)
-            if self.dataset == 'gtsrb':
-                model = WideResNetBase(depth=28, n_channels=3, widen_factor=2, dropRate=0.0, norm_type='batchnorm',n_classes=self.args['num_classes'])
-            else:
-                model = WideResNetBase(depth=28, n_channels=3, widen_factor=2, dropRate=0.0, norm_type='batchnorm')
+            model = WideResNetBase(depth=28, n_channels=3, widen_factor=2, dropRate=0.0, norm_type='batchnorm',n_classes=self.args['num_classes'])
+ 
 
 
         elif self.args['model'] == 'resnet18':
@@ -151,10 +136,7 @@ class EmbeddingModel:
             target = target.long()
             pred = self.model(data)
 
-            if self.focal_loss:
-                m = torch.nn.Softmax(dim=1)
-                pred = m(pred)
-
+           
             loss = self.loss_function(pred, target)
 
             self.optimizer.zero_grad()
@@ -318,14 +300,7 @@ class Resnet(torch.nn.Module):
         self.resnet = resnet18(pretrained=True)
         # del self.resnet.fc
 
-        try:
-            print('load Resnet-18 checkpoint')
-            self.load_my_state_dict(
-                torch.load(
-                    os.getcwd()[:-len('Embedding-Semi-Supervised')] + "/nih_images/checkpoint.pretrain"),
-                strict=False)
-        except FileNotFoundError:
-            print('load Resnet-18 pretrained on ImageNet')
+        print('load Resnet-18 pretrained on ImageNet')
 
         # for param in self.resnet.parameters():
         #    param.requires_grad = False
@@ -355,7 +330,7 @@ class Resnet(torch.nn.Module):
             return features
         else:
             out = self.resnet.fc(features)
-            out = nn.Softmax(dim=1)(out)
+            # out = nn.Softmax(dim=1)(out)
             return out
 
 

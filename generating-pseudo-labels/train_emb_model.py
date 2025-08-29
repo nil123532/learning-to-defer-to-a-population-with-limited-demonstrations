@@ -4,8 +4,8 @@ from torch.utils.tensorboard import SummaryWriter
 from absl import flags
 from absl import app
 
-from feature_extractor.utils import save_to_logs, get_train_dir
-from feature_extractor.emb_model_lib import EmbeddingModel
+from lib.utils import save_to_logs, get_train_dir
+from lib.emb_model_lib import EmbeddingModel
 
 wkdir = os.getcwd()
 sys.path.append(wkdir)
@@ -46,6 +46,7 @@ def main(argv):
         save_to_logs(train_dir, valid_acc, loss.item())
         # save model to checkpoint
         emb_model.save_to_checkpoint(epoch, loss, valid_acc)
+        break
     # get test accuracy
     emb_model.get_test_accuracy()
 

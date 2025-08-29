@@ -85,7 +85,7 @@ class MyVisionDataset(VisionDataset):
 
 
 class ContextSampler():
-    def __init__(self, images, labels, transform, original_indices=None, n_cntx_pts=50, device='cpu',use_balanced_sampler=True, **kwargs):
+    def __init__(self, images, labels, transform, original_indices=None, n_cntx_pts=50, device='cpu',use_balanced_sampler=False, **kwargs):
         self.n_cntx_pts = n_cntx_pts
         self.device = device
         self.with_additional_label = False

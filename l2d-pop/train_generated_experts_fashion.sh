@@ -44,12 +44,8 @@ command="python main_test_expert.py --l2d=${l2d} --p_out=${p_out} --mode=${mode}
                         --train_batch_size=${train_batch_size} --lr_wrn=${lr_wrn} --lr_other=${lr_other} --weight_decay=${weight_decay}\
                         --dataset=${dataset} --val_batch_size=${val_batch_size} --test_batch_size=${test_batch_size}\
                         --epochs=${epochs} --n_cntx_pts=${n_cntx_pts} --depth_embed=${depth_embed}\
-<<<<<<< HEAD
                         --depth_reject=${depth_reject} --norm_type=${norm_type} --loss_type=${loss_type} ${flags} --expert_labels=${expert_labels} --train_type=${train_type} \
                         --expert_type=${expert_type}"
-=======
-                        --depth_reject=${depth_reject} --norm_type=${norm_type} --loss_type=${loss_type} ${flags} --expert_labels=${expert_labels} --train_type=${train_type} --expert_type=${expert_type}"
->>>>>>> 318f51fafba8e9b2a3b03a5f57f842c54fb65e1d
 echo ${command}
 
 eval $command

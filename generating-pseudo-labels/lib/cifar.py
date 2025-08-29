@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
-from torchvision.datasets import GTSRB, FashionMNIST, CIFAR10
+from torchvision.datasets import GTSRB, FashionMNIST
 from torch.utils.data import Dataset
 
 from lib import transform as T
@@ -87,9 +87,6 @@ def  load_data_train(L=250, dataset='CIFAR10', dspth='./data'):
     """
 
     if dataset == 'CIFAR10':
-        #download cifar10 dataset
-        _ = CIFAR10(root=dspth, train=True, download=True)
-        _ = CIFAR10(root=dspth, train=False, download=True)
         datalist = [
             osp.join(dspth, 'cifar-10-batches-py', 'data_batch_{}'.format(i + 1))
             for i in range(5)
@@ -116,7 +113,6 @@ def  load_data_train(L=250, dataset='CIFAR10', dspth='./data'):
         data = np.concatenate(data, axis=0)     # shape = [50000, 3072] for CIFAR-10
         labels = np.concatenate(labels, axis=0) # shape = [50000]
         labels_coarse = transform_to_coarse(labels) if dataset=='CIFAR100' else labels
-
         # Let's create an array of "global indices" 0..49999
         all_indices = np.arange(len(labels))
 
@@ -290,7 +286,7 @@ def load_data_val(dataset='CIFAR10', dspth='./data', cntx_per_class=None):
         for f in datalist:
             with open(f, 'rb') as fr:
                 entry = pickle.load(fr, encoding='latin1')
-                lbs = entry['labels']
+                lbs = entry['labels'] if 'labels' in entry.keys() else entry['fine_labels']
                 data.append(entry['data'])
                 labels.append(lbs)
 
@@ -666,7 +662,7 @@ def get_train_loader(dataset, expert, batch_size, mu, n_iters_per_epoch, L, root
     #         label_u = expert.generate_expert_labels(label_u, binary=True)
 
     if dataset == 'CIFAR10' or dataset == 'CIFAR100':
-        if dataset == 'CIFAR10':
+        if dataset == 'CIFAR10' or dataset == 'CIFAR100':
             normalize = transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
                                         std=[x / 255.0 for x in [63.0, 62.1, 66.7]])
             transform_train = transforms.Compose([
@@ -674,7 +670,8 @@ def get_train_loader(dataset, expert, batch_size, mu, n_iters_per_epoch, L, root
                 normalize,
 
             ])
-        cntx_sampler = ContextSampler(data_x,label_x,transform_train,n_cntx_pts=20,device='cuda')
+        n_cntx_pts = 20
+        cntx_sampler = ContextSampler(data_x,label_x,transform_train,n_cntx_pts=n_cntx_pts,device='cuda')
         ds_x = Cifar(
             dataset=dataset,
             data=data_x,
@@ -685,13 +682,13 @@ def get_train_loader(dataset, expert, batch_size, mu, n_iters_per_epoch, L, root
         )  # return an iter of num_samples length (all indices of samples)
         
         print("unique labels in ds_x: ", np.unique(ds_x.labels))
-        sampler_weights = get_class_weights_sampler(ds_x,2) if weighted else None
-        if sampler_weights is not None:
-            print("Weighted sampler")
-            sampler_x = WeightedRandomSampler(sampler_weights, num_samples=n_iters_per_epoch * batch_size, replacement=True)
-        else:
-            print("Normal Sampler")
-            sampler_x = RandomSampler(ds_x, replacement=True, num_samples=n_iters_per_epoch * batch_size)
+        # sampler_weights = get_class_weights_sampler(ds_x,2) if weighted else None
+        # if sampler_weights is not None:
+        #     print("Weighted sampler")
+        #     sampler_x = WeightedRandomSampler(sampler_weights, num_samples=n_iters_per_epoch * batch_size, replacement=True)
+        # else:
+        print("Normal Sampler")
+        sampler_x = RandomSampler(ds_x, replacement=True, num_samples=n_iters_per_epoch * batch_size)
         batch_sampler_x = BatchSampler(sampler_x, batch_size, drop_last=True)  # yield a batch of samples one time
         dl_x = torch.utils.data.DataLoader(
             ds_x,
@@ -769,13 +766,13 @@ def get_train_loader(dataset, expert, batch_size, mu, n_iters_per_epoch, L, root
         )  # return an iter of num_samples length (all indices of samples)
         
         print("unique labels in ds_x: ", np.unique(ds_x.labels))
-        sampler_weights = get_class_weights_sampler(ds_x,2) if weighted else None
-        if sampler_weights is not None:
-            print("Weighted sampler")
-            sampler_x = WeightedRandomSampler(sampler_weights, num_samples=n_iters_per_epoch * batch_size, replacement=True)
-        else:
-            print("Normal Sampler")
-            sampler_x = RandomSampler(ds_x, replacement=True, num_samples=n_iters_per_epoch * batch_size)
+        # sampler_weights = get_class_weights_sampler(ds_x,2) if weighted else None
+        # if sampler_weights is not None:
+        #     print("Weighted sampler")
+        #     sampler_x = WeightedRandomSampler(sampler_weights, num_samples=n_iters_per_epoch * batch_size, replacement=True)
+        # else:
+        #     print("Normal Sampler")
+        sampler_x = RandomSampler(ds_x, replacement=True, num_samples=n_iters_per_epoch * batch_size)
         batch_sampler_x = BatchSampler(sampler_x, batch_size, drop_last=True)  # yield a batch of samples one time
         dl_x = torch.utils.data.DataLoader(
             ds_x,
@@ -834,67 +831,6 @@ def get_train_loader(dataset, expert, batch_size, mu, n_iters_per_epoch, L, root
 
             return dl_x, dl_u,cntx_sampler,dl_x_eval,dl_u_pred
     
-    elif dataset == 'ham10000': 
-        # Labeled dataset
-   
-        ds_x = HAM10000Dataset(
-            data=data_x,
-            labels=label_x,
-            mode='train_x',
-            imsize=imsize,
-            indices=global_ind_x
-        )
-        print("unique labels in ds_x: ", np.unique(ds_x.labels))
-        sampler_weights = get_class_weights_sampler(ds_x, 2) if weighted else None
-        if sampler_weights is not None:
-            print("Weighted sampler")
-            sampler_x = WeightedRandomSampler(
-                sampler_weights,
-                num_samples=n_iters_per_epoch * batch_size,
-                replacement=True
-            )
-        else:
-            print("Normal Sampler")
-            sampler_x = RandomSampler(
-                ds_x,
-                replacement=True,
-                num_samples=n_iters_per_epoch * batch_size
-            )
-        batch_sampler_x = BatchSampler(sampler_x, batch_size, drop_last=True)
-        dl_x = torch.utils.data.DataLoader(
-            ds_x,
-            batch_sampler=batch_sampler_x,
-            num_workers=2,
-            pin_memory=True
-        )
-
-        # If no unlabeled data, return only the labeled loader
-        if data_u is None:
-            return dl_x
-
-        # Unlabeled dataset
-        ds_u = HAM10000Dataset(
-            data=data_u,
-            labels=label_u,
-            mode=f'train_u_{method}',
-            imsize=imsize,
-            indices=global_ind_u
-        )
-        sampler_u = RandomSampler(
-            ds_u,
-            replacement=True,
-            num_samples=mu * n_iters_per_epoch * batch_size
-        )
-        batch_sampler_u = BatchSampler(sampler_u, batch_size * mu, drop_last=True)
-        dl_u = torch.utils.data.DataLoader(
-            ds_u,
-            batch_sampler=batch_sampler_u,
-            num_workers=2,
-            pin_memory=True
-        )
-    
-        return dl_x, dl_u
-    
     elif dataset == 'FASHION':
         normalize = transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
                                             std=[x / 255.0 for x in [63.0, 62.1, 66.7]])
@@ -903,7 +839,8 @@ def get_train_loader(dataset, expert, batch_size, mu, n_iters_per_epoch, L, root
             transforms.Lambda(lambda x: x.repeat(3, 1, 1)),  # Convert 1-channel to 3-channel
             normalize,
         ])
-        cntx_sampler = ContextSampler(data_x,label_x,transform_train,n_cntx_pts=20,device='cuda')
+        n_cntx_pts = 20
+        cntx_sampler = ContextSampler(data_x,label_x,transform_train,n_cntx_pts=n_cntx_pts,device='cuda')
         ds_x = FASHIONMNISTDATASET(
             data=data_x,
             labels=label_x,
@@ -912,14 +849,14 @@ def get_train_loader(dataset, expert, batch_size, mu, n_iters_per_epoch, L, root
             indices=global_ind_x  # pass the global indices to the dataset
         )  # return an iter of num_samples length (all indices of samples)
         
-        print("unique labels in ds_x: ", np.unique(ds_x.labels))
-        sampler_weights = get_class_weights_sampler(ds_x,2) if weighted else None
-        if sampler_weights is not None:
-            print("Weighted sampler")
-            sampler_x = WeightedRandomSampler(sampler_weights, num_samples=n_iters_per_epoch * batch_size, replacement=True)
-        else:
-            print("Normal Sampler")
-            sampler_x = RandomSampler(ds_x, replacement=True, num_samples=n_iters_per_epoch * batch_size)
+        # print("unique labels in ds_x: ", np.unique(ds_x.labels))
+        # # sampler_weights = get_class_weights_sampler(ds_x,2) if weighted else None
+        # if sampler_weights is not None:
+        #     print("Weighted sampler")
+        #     sampler_x = WeightedRandomSampler(sampler_weights, num_samples=n_iters_per_epoch * batch_size, replacement=True)
+        # else:
+        print("Normal Sampler")
+        sampler_x = RandomSampler(ds_x, replacement=True, num_samples=n_iters_per_epoch * batch_size)
         batch_sampler_x = BatchSampler(sampler_x, batch_size, drop_last=True)  # yield a batch of samples one time
         dl_x = torch.utils.data.DataLoader(
             ds_x,
@@ -982,7 +919,7 @@ def get_train_loader(dataset, expert, batch_size, mu, n_iters_per_epoch, L, root
 
 
 
-def get_val_loader(dataset, expert, batch_size, num_workers, pin_memory=True, root='data', imsize=32):
+def get_val_loader(dataset, expert, batch_size, num_workers, pin_memory=True, root='data', imsize=32,L=20):
     """Get data loader for the validation set
 
     :param dataset: Name of the dataset
@@ -996,7 +933,7 @@ def get_val_loader(dataset, expert, batch_size, num_workers, pin_memory=True, ro
     :return: Dataloader
     """
     
-    data_x, labels_x , data_test , labels_test , indices_x , indices_test = load_data_val(dataset=dataset, dspth=root,cntx_per_class=50)
+    data_x, labels_x , data_test , labels_test , indices_x , indices_test = load_data_val(dataset=dataset, dspth=root,cntx_per_class=2)
 
     if dataset == 'CIFAR10' or dataset == 'CIFAR100':
         normalize = transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
@@ -1012,7 +949,8 @@ def get_val_loader(dataset, expert, batch_size, num_workers, pin_memory=True, ro
         print("Length of context set:", len(data_x))
         print("Length of test set:", len(data_test))    
         
-        cntx_sampler = ContextSampler(data_x,labels_x,transform_test,original_indices=indices_x,n_cntx_pts=20,device='cuda')
+        n_cntx_pts = 20
+        cntx_sampler = ContextSampler(data_x,labels_x,transform_test,original_indices=indices_x,n_cntx_pts=n_cntx_pts,device='cuda')
         ds = Cifar(
             dataset=dataset,
             data=data_test,
@@ -1032,7 +970,7 @@ def get_val_loader(dataset, expert, batch_size, num_workers, pin_memory=True, ro
         return dl , cntx_sampler
     
     if dataset == 'GTSRB':
-        data_x, labels_x , data_test , labels_test , indices_x , indices_test = load_data_val(dataset=dataset, dspth=root,cntx_per_class=11)
+        data_x, labels_x , data_test , labels_test , indices_x , indices_test = load_data_val(dataset=dataset, dspth=root,cntx_per_class=2)
         #need new load data here, loading <500 labels
         normalize = transforms.Normalize(mean=[x / 255.0 for x in [87.1, 79.7, 82.0]],
                                     std=[x / 255.0 for x in [69.8, 66.5, 67.9]])
@@ -1060,24 +998,6 @@ def get_val_loader(dataset, expert, batch_size, num_workers, pin_memory=True, ro
             pin_memory=pin_memory
         )
         return dl , cntx_sampler
-
-    
-    if dataset == 'ham10000':
-        ds = HAM10000Dataset(
-            data=data,
-            labels=labels,
-            mode='test',
-            imsize=imsize
-        )
-        dl = torch.utils.data.DataLoader(
-            ds,
-            shuffle=False,
-            batch_size=batch_size,
-            drop_last=False,
-            num_workers=num_workers,
-            pin_memory=pin_memory
-        )
-        return dl
     
     if dataset == 'FASHION':
         normalize = transforms.Normalize(mean=[x / 255.0 for x in [125.3, 123.0, 113.9]],
@@ -1090,7 +1010,8 @@ def get_val_loader(dataset, expert, batch_size, num_workers, pin_memory=True, ro
         print("Length of context set:", len(data_x))
         print("Length of test set:", len(data_test))    
         
-        cntx_sampler = ContextSampler(data_x,labels_x,transform_test,original_indices=indices_x,n_cntx_pts=20,device='cuda')
+        n_cntx_pts = 20
+        cntx_sampler = ContextSampler(data_x,labels_x,transform_test,original_indices=indices_x,n_cntx_pts=n_cntx_pts,device='cuda')
         ds = FASHIONMNISTDATASET(
             data=data_test,
             labels=labels_test,

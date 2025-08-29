@@ -56,14 +56,19 @@ class EmbeddingModel:
             model = self.load_emb_net_from_checkpoint(model, wkdir)
             model.linear = nn.Identity()
 
+        elif self.dataset == 'cifar100':
+            model = timm.create_model(self.args['fe_model'], pretrained=True, num_classes=self.args['num_classes'])
+            model = self.load_emb_net_from_checkpoint(model, wkdir)
+            model = torch.nn.Sequential(*list(model.children())[:-1])
+
 
         model = to_device(model, self.device)
         return model
 
     def get_embedding(self, batch):
         """Resize CIFAR-10 images to 224x224 for EfficientNet"""
-        # if self.dataset in ['cifar100', 'cifar10']:  # Modified condition for efficientnet
-        #     batch = T.Resize((224, 224))(batch)
+        if self.dataset in ['cifar100']:  # Modified condition for efficientnet
+            batch = T.Resize((224, 224))(batch)
         self.emb_model.eval()
     
         return self.emb_model(batch)
@@ -95,7 +100,7 @@ class EmbeddingModel:
         cp_dir = self.get_emb_net_dir(wkdir) + 'checkpoints/checkpoint.' + mode
         try:
             # load state dict from checkpoint
-            checkpoint = torch.load(cp_dir)
+            checkpoint = torch.load(cp_dir,weights_only=False)
             emb_model.load_state_dict(checkpoint['model_state_dict'])
             print('Found base net checkpoint at', cp_dir)
         except FileNotFoundError:

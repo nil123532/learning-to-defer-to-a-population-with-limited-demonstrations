@@ -2,7 +2,11 @@ generating-pseudo-labels/CIFAR10/
 generating-pseudo-labels/FASHION/
 generating-pseudo-labels/GTSRB/
 generating-pseudo-labels/data/
-generating-pseudo-labels/artificial_expert_labels/
+generating-pseudo-labels/artificial_expert_labels/cifar10/
+generating-pseudo-labels/artificial_expert_labels/fashion/
+generating-pseudo-labels/artificial_expert_labels/gtsrb/
+generating-pseudo-labels/artificial_expert_labels/data
+generating-pseudo-labels/CIFAR100/
 l2d-pop/data/
 l2d-pop/runs/
 l2d-pop/pretrained/

@@ -44,13 +44,13 @@ bash train_generated_experts_cifar.sh single 2 train 0 500 w H && bash train_gen
 Accuracy v/s L experiments:
 
 CIFAR 
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 20 --ex_strength 2  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn  && 
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 40 --ex_strength 2  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 60 --ex_strength 2  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 100 --ex_strength 2  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 200 --ex_strength 2  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 2  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 2500 --ex_strength 2  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn 
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled 20 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  && 
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled 40 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled 60 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled 100 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled 200 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled 2500 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn 
 
 FASHION
 python train_embedding_fm.py --exp-dir expert_0  --n-labeled 20 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn  && 
@@ -62,11 +62,42 @@ python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 2
 python train_embedding_fm.py --exp-dir expert_0  --n-labeled 2500 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn 
 
 GTSRB
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 86 --ex_strength 8  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  && 
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 172 --ex_strength 8  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 258 --ex_strength 8  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 430 --ex_strength 8  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled  860 --ex_strength 8  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 8  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 2150 --ex_strength 8  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn 
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled 86 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn  && 
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled 172 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn  &&
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled 258 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn  &&
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled 430 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn  &&
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled  860 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn  &&
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn  &&
+python train_embedding_fm.py --exp-dir expert_0  --n-labeled 2150 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn 
 
+
+
+FASHION
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 20 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single  && 
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 40 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 60 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 100 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 200 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 500 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 2500 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single 
+
+
+
+FASHION
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 20 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single  && 
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 40 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 60 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 100 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 200 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 500 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 2500 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single 
+
+
+CIFAR100
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 40 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single  && 
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 80 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 120 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 200 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 400 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 1000 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single  &&
+python train_embedding_fm.py --exp-dir expert_4  --n-labeled 5000 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single 

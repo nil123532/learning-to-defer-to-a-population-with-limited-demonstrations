@@ -40,7 +40,7 @@ if [ "${decouple}" = true ]; then
     flags="${flags} --decouple"
 fi
 
-command="python main.py --l2d=${l2d} --p_out=${p_out} --mode=${mode} --seed=${seed}\
+command="python main_test_expert.py --l2d=${l2d} --p_out=${p_out} --mode=${mode} --seed=${seed}\
                         --train_batch_size=${train_batch_size} --lr_wrn=${lr_wrn} --lr_other=${lr_other} --weight_decay=${weight_decay}\
                         --dataset=${dataset} --val_batch_size=${val_batch_size} --test_batch_size=${test_batch_size}\
                         --epochs=${epochs} --n_cntx_pts=${n_cntx_pts} --depth_embed=${depth_embed}\

@@ -156,7 +156,7 @@ class ClassifierRejectorWithContextEmbedder(nn.Module):
         else:
             self.embed = None #if single is chosen 
         
-        if with_attn == 'attn':
+        if self.with_attn == 'attn':
             self.attn = MultiHeadAttn(n_features, n_features, dim_hid, dim_hid)
         
         self.with_attn = True if with_attn == 'attn' else False
