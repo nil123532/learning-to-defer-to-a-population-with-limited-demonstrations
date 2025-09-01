@@ -50,12 +50,13 @@ python train_emb_model.py --dataset CHOSEN_DATASET --model wideresnet --num_clas
 Once pre-training is complete, generate labels using:
 
 ```bash
-python train_embedding_fm.py --exp-dir EXP_DIR --n-labeled N_LABELED --ex_strength EX_STRENGTH \
+python train_embedding_fm.py --exp-dir expert_0 --n-labeled N_LABELED --ex_strength EX_STRENGTH \
     --dataset CHOSEN_DATASET --n-epoches 50 --batchsize 64 --seed 0 --p-out P_OUT --with-attn attn
 ```
 
 **Arguments:**
-- `N_LABELED`: number of labeled samples (range: 20–430 depending on dataset)  
+- `N_LABELED`: number of labeled samples per expert (range: 20–2500 depending on dataset)  
+- `CHOSEN_DATASET ∈ {CIFAR10, GTSRB, FASHION}`
 - `P_OUT`: {8, 34}, depending on the dataset  
 - `EX_STRENGTH`: {8, 34}, depending on the dataset  
 
@@ -72,8 +73,8 @@ After generating labels for the full population:
   - `fashion.py`
   - `gtsrb.py`
 
-- Move the generated `.npy` files into the `l2d-pop` directory using the corresponding `move_*.py` script.
-- Also use the `move_*.py` script to move pre-trained checkpoints for the context embedder.
+- Move the generated `.npy` files into the `l2d-pop` directory using the corresponding `move_*.py` script in `artificial_expert_labels` directory.
+- Then use the `move_*.py` script in the main directory to move pre-trained checkpoints for the context embedder.
 
 ---
 
