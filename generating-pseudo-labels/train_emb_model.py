@@ -46,7 +46,7 @@ def main(argv):
         save_to_logs(train_dir, valid_acc, loss.item())
         # save model to checkpoint
         emb_model.save_to_checkpoint(epoch, loss, valid_acc)
-        break
+    
     # get test accuracy
     emb_model.get_test_accuracy()
 

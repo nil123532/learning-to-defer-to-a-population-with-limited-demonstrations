@@ -9,7 +9,7 @@ for e in labels:
     for p in expert_strengths:
         # Path relative to current directory (expert_8/)
         src = os.path.join(f"CIFAR10/ex{p}_x{e}_seed0_attn", "ckp.latest")
-        dst_dir = os.path.join("..", "..", "l2d-pop", "pretrained", "cifar10", "attention", f"e_{e}_p{p}")
+        dst_dir = os.path.join("..", "l2d-pop", "pretrained", "cifar10", "attention", f"e_{e}_p{p}")
         dst = os.path.join(dst_dir, "ckp.latest")
 
         # Ensure destination directory exists
