@@ -111,7 +111,7 @@ def main(argv):
 
 
     NUM_CLASSES = 43
-    labels = [86,172,258,430,860,2150]  # Example array, as in your original code
+    labels = [86,172,258,430,860,2150]
     EX_STRENGTHS = [34]
     seeds = [i+1 for i in range(15)]
     # seeds.append(69)  # optional

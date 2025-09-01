@@ -3,10 +3,12 @@ import shutil
 
 # Define e (label counts) and p (expert strengths)
 labels = [86,172,258,430,860,2150]
+# labels = [473]
 expert_strengths =  [34]
+exp_dir = "expert_0"
 for e in labels:
     for p in expert_strengths:
-        src = os.path.join(f"GTSRB/ex{p}_x{e}_seed0_attn", "ckp.latest")
+        src = os.path.join(f"GTSRB/{exp_dir}/ex{p}_x{e}_seed0_attn", "ckp.latest")
         dst_dir = os.path.join("..", "l2d-pop", "pretrained", "gtsrb", "attention", f"e_{e}_p{p}")
         dst = os.path.join(dst_dir, "ckp.latest")
 

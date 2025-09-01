@@ -6,8 +6,8 @@ src_base = os.path.join("fashion")
 dst_base = os.path.join("..", "..", "l2d-pop", "data", "generated_expert_labels_fashion")
 
 # Define your label sizes and expert strengths
-# labels = [20, 40, 60, 100, 200, 500, 2500]
-labels = [500]
+labels = [20, 40, 60, 100, 200, 500, 2500]
+# labels = [500]
 EX_STRENGTHS = [8]
 
 for l in labels:

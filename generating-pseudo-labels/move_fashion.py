@@ -4,7 +4,7 @@ import shutil
 # Define e (label counts) and p (expert strengths)
 labels = [20, 40, 60, 100, 200, 500, 2500]
 expert_strengths = [8]
-exp_dir = "0"
+exp_dir = "expert_0"
 
 for e in labels:
     for p in expert_strengths:

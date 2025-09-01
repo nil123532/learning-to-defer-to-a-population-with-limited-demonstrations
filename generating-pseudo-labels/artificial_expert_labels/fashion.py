@@ -108,8 +108,8 @@ def main(argv):
 
 
     NUM_CLASSES = 10
-    # labels = [20,40,60,100,200,500,2500]  # Example array, as in your original code
-    labels = [500]
+    labels = [20,40,60,100,200,500,2500]  # Example array, as in your original code
+    # labels = [500]
     EX_STRENGTHS = [8]
     seeds = [i+1 for i in range(15)]
     # seeds.append(69)  # optional

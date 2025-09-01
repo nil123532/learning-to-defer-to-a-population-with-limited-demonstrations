@@ -841,7 +841,7 @@ def load_fashion_mnist(model):
     if model != 'efficientnet_b1':
         img_size = (32, 32)
     else:
-        img_size = (224, 224)
+        img_size = (32, 32)
 
     # specify transforms
     train_transform = tt.Compose([
@@ -917,7 +917,7 @@ def load_gtsrb(
     if model != 'efficientnet_b1':
         IMG_SIZE = (32, 32)
     else:
-        IMG_SIZE = (224, 224)
+        IMG_SIZE = (32, 32)
 
     mean = [0.3403, 0.3121, 0.3214]
     std  = [0.2724, 0.2608, 0.2669]

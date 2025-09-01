@@ -10,7 +10,7 @@ import pandas as pd
 from PIL import Image
 import os
 from lib.utils import ROOT,BalancedBatchSampler
-from medmnist import PathMNIST , OrganAMNIST , OrganCMNIST , BloodMNIST
+# from medmnist import PathMNIST , OrganAMNIST , OrganCMNIST , BloodMNIST
 from torchvision.datasets import ImageFolder
 from pathlib import Path
 from collections import Counter
