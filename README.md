@@ -1,103 +1,102 @@
-# learning-to-defer-to-a-population-with-limited-demonstrations
-Implementation of Learning to Defer to a population with limited expert demonstration
+# Running the Experiments
 
+This guide explains how to set up the environment, generate pseudo-labels, and run **Learning to Defer to a Population (L2D-POP)** experiments.
 
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 2  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn --finetune &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 5  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 5 --with-attn attn --finetune &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn --finetune &&
+---
 
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn --finetune &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 5  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 5 --with-attn attn --finetune &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 8  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn --finetune &&
+## 1. Environment Setup
 
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 473 --ex_strength 8  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn --finetune &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 473 --ex_strength 21  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 21 --with-attn attn --finetune &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 473 --ex_strength 30  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 30 --with-attn attn --finetune &&
+First, create a dedicated conda environment with Python 3.9:
 
-python train_embedding_fm.py --exp-dir expert_1  --n-labeled 500 --ex_strength 1  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 1 --with-attn mlp --finetune &&
-python train_embedding_fm.py --exp-dir expert_1  --n-labeled 500 --ex_strength 5  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 5 --with-attn mlp --finetune &&
-python train_embedding_fm.py --exp-dir expert_1  --n-labeled 500 --ex_strength 9  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 9 --with-attn mlp --finetune &&
+```bash
+conda create -n limited_pop_l2d python=3.9
+conda activate limited_pop_l2d
+```
 
-python train_embedding_fm.py --exp-dir expert_1  --n-labeled 500 --ex_strength 1  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 1 --with-attn mlp --finetune &&
-python train_embedding_fm.py --exp-dir expert_1  --n-labeled 500 --ex_strength 5  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 5 --with-attn mlp --finetune &&
-python train_embedding_fm.py --exp-dir expert_1  --n-labeled 500 --ex_strength 9  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 9 --with-attn mlp --finetune &&
+Then, install the required dependencies:
 
-python train_embedding_fm.py --exp-dir expert_1  --n-labeled 473 --ex_strength 4  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 4 --with-attn mlp --finetune &&
-python train_embedding_fm.py --exp-dir expert_1  --n-labeled 473 --ex_strength 21  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 21 --with-attn mlp --finetune &&
-python train_embedding_fm.py --exp-dir expert_1  --n-labeled 473 --ex_strength 38  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 38 --with-attn mlp --finetune
+```bash
+# Install PyTorch
+conda install pytorch torchvision torchaudio -c pytorch -c nvidia
 
+# Install core libraries
+conda install numpy scipy matplotlib jupyterlab jupyter_console jupyter_client scikit-learn
 
-<<<<<<< HEAD
-bash train_gtsrb.sh single 21 train 0 473 w H && bash train_gtsrb.sh single 30 train 0 473 w H
-bash fashion.sh single 2 train 0 500 w H && bash fashion.sh single 5 train 0 500 w H && bash fashion.sh single 8 train 0 500 w H
-bash train_cifar10.sh single 2 train 0 500 w H && bash train_cifar10.sh single 5 train 0 500 w H && bash train_cifar10.sh single 8 train 0 500 w H
-=======
+# Additional packages
+pip install attrdict tensorboard_logger timm tensorboard pandas opencv-python seaborn
+```
 
-bash train_generated_experts_gtsrb.sh single 21 train 0 473 w H && bash train_generated_experts_gtsrb.sh single 30 train 0 473 w H
-bash train_generated_experts_fashion.sh single 2 train 0 500 w H && bash train_generated_experts_fashion.sh single 5 train 0 500 w H && bash train_generated_experts_fashion.sh single 8 train 0 500 w H
-bash train_generated_experts_cifar.sh single 2 train 0 500 w H && bash train_generated_experts_cifar.sh single 5 train 0 500 w H && bash train_generated_experts_cifar.sh single 8 train 0 500 w H
-<<<<<<< HEAD
->>>>>>> 318f51fafba8e9b2a3b03a5f57f842c54fb65e1d
-=======
+---
 
+## 2. Generate Pseudo-Labels
 
-Accuracy v/s L experiments:
+All scripts for generating pseudo-labels are located in the `generating-pseudo-labels` directory.
 
-CIFAR 
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 20 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  && 
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 40 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 60 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 100 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 200 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 2500 --ex_strength 8  --dataset CIFAR10 --n-epoches 50 --batchsize 64 --seed 0  --p-out 8 --with-attn attn 
+### Step 2.1: Pre-train the Embedding Model
 
-FASHION
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 20 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn  && 
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 40 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 60 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 100 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 200 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 2500 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn attn 
+Run the following command to pre-train the embedding model on your chosen dataset:
 
-GTSRB
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 86 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn  && 
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 172 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 258 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 430 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled  860 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 500 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn  &&
-python train_embedding_fm.py --exp-dir expert_0  --n-labeled 2150 --ex_strength 34  --dataset GTSRB --n-epoches 50 --batchsize 64 --seed 0  --p-out 34 --with-attn attn 
+```bash
+python train_emb_model.py --dataset CHOSEN_DATASET --model wideresnet --num_classes NUM_CLASSES --batch 128 --lr 0.001
+```
 
+- `CHOSEN_DATASET ∈ {cifar10, gtsrb, fashion}`
+- `num_classes`: number of classes in the dataset
 
+---
 
-FASHION
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 20 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single  && 
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 40 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 60 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 100 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 200 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 500 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 2500 --ex_strength 2  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 2 --with-attn single 
+### Step 2.2: Generate Labels
 
+Once pre-training is complete, generate labels using:
 
+```bash
+python train_embedding_fm.py --exp-dir EXP_DIR --n-labeled N_LABELED --ex_strength EX_STRENGTH \
+    --dataset CHOSEN_DATASET --n-epoches 50 --batchsize 64 --seed 0 --p-out P_OUT --with-attn attn
+```
 
-FASHION
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 20 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single  && 
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 40 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 60 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 100 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 200 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 500 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 2500 --ex_strength 6  --dataset FASHION --n-epoches 50 --batchsize 64 --seed 0  --p-out 6 --with-attn single 
+**Arguments:**
+- `N_LABELED`: number of labeled samples (range: 20–430 depending on dataset)  
+- `P_OUT`: {8, 34}, depending on the dataset  
+- `EX_STRENGTH`: {8, 34}, depending on the dataset  
 
+Repeat for all desired `N_LABELED` values for your chosen dataset.
 
-CIFAR100
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 40 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single  && 
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 80 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 120 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 200 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 400 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 1000 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single  &&
-python train_embedding_fm.py --exp-dir expert_4  --n-labeled 5000 --ex_strength 60  --dataset CIFAR100 --n-epoches 50 --batchsize 64 --seed 0  --p-out 60 --with-attn single 
+---
+
+### Step 2.3: Create `.npy` Files
+
+After generating labels for the full population:
+
+- Use the appropriate script in the `artificial_expert_labels` directory to create `.npy` files:
+  - `cifar.py`
+  - `fashion.py`
+  - `gtsrb.py`
+
+- Move the generated `.npy` files into the `l2d-pop` directory using the corresponding `move_*.py` script.
+- Also use the `move_*.py` script to move pre-trained checkpoints for the context embedder.
+
+---
+
+## 3. Training L2D-POP
+
+Once setup is complete, switch to the `l2d-pop` directory.
+
+### Train with Ground Truth Labels
+
+```bash
+python train_CHOSEN_DATASET.py L2D_METHOD P_OUT MODE 0 ANY_NUM n H
+```
+
+### Train with Generated Labels
+
+```bash
+python train_generated_experts_CHOSEN_DATASET.py L2D_METHOD P_OUT MODE 0 N_LABELED n H
+```
+
+**Arguments:**
+- `CHOSEN_DATASET`: cifar10, gtsrb, or fashion  
+- `L2D_METHOD`: specify the learning-to-defer method  
+- `P_OUT`: {8, 34}, depending on the dataset  
+- `MODE`: typically 0  
+- `ANY_NUM / N_LABELED`: number of labeled samples used in training  
+- `H`: specifies the expert strength or index used  
