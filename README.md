@@ -62,6 +62,8 @@ python train_embedding_fm.py --exp-dir expert_0 --n-labeled N_LABELED --ex_stren
 
 Repeat for all desired `N_LABELED` values for your chosen dataset.
 
+⚠️ **Note:** Sometimes the embedding model checkpoint may be located in a different directory than expected.  
+If this happens, simply copy-paste the checkpoint from the pre-training step (Step 2.1) into the required directory before running this command.
 ---
 
 ### Step 2.3: Create `.npy` Files
