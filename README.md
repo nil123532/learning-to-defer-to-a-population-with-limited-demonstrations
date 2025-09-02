@@ -99,8 +99,8 @@ python train_generated_experts_CHOSEN_DATASET.py L2D_METHOD P_OUT MODE 0 N_LABEL
 
 **Arguments:**
 - `CHOSEN_DATASET`: cifar10, gtsrb, or fashion  
-- `L2D_METHOD`: specify the learning-to-defer method  
+- `L2D_METHOD`: specify the learning-to-defer method either {pop_attn,pop,single}
 - `P_OUT`: {8, 34}, depending on the dataset  
-- `MODE`: typically 0  
+- `MODE`: {train,test}
 - `ANY_NUM / N_LABELED`: number of labeled samples used in training  
-- `H`: specifies the expert strength or index used  
+- `H`: specifies the expert type
