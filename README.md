@@ -1,6 +1,6 @@
 # Running the Experiments
 
-This guide explains how to set up the environment, generate pseudo-labels, and run **Learning to Defer to a Population (L2D-POP)** experiments.
+This guide explains how to set up the environment, generate pseudo-labels, and run **Learning to Defer to a Population (L2D-POP)** experiments from the paper here:  https://ieeexplore.ieee.org/abstract/document/11302495
 
 ---
 
